@@ -23,7 +23,7 @@
     "./converge": "./lib/converge.mjs",
     "./feedback": "./lib/feedback.mjs"
   },
-  "bin": { "ideate": "./bin/ideate.mjs" },
+  "bin": { "ideate": "bin/ideate.mjs" },
   "files": ["lib", "bin", "docs", "NOTICE", "!lib/*.test.mjs"],
   "scripts": {
     "test": "node --test lib/*.test.mjs"

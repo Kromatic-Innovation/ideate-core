@@ -1,0 +1,70 @@
+name: Release
+
+# Publish @kromatic-innovation/ideate-core to the PUBLIC npm registry (Apache-2.0)
+# on a v* tag. This is DISTINCT from the internal GitHub Packages publish
+# (package.json `publishConfig.registry`): this job deletes that publishConfig
+# entry in-CI so the release targets npmjs.org, and publishes with
+# `--access public`. npm provenance is enabled when the repo is public
+# (provenance requires a public repo); while private it is skipped.
+#
+# The NPM_TOKEN secret is human-provisioned (a granular automation token scoped
+# to the @kromatic-innovation org, publish rights). The first LIVE publish
+# happens at the open-sourcing gate; until then use the manual dry-run.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validate with npm publish --dry-run (no real publish)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write # npm provenance
+
+jobs:
+  release:
+    name: Publish to public npm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Set up Node.js (public npm registry, scoped)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+          scope: "@kromatic-innovation"
+      - name: Test
+        run: node --test lib/*.test.mjs
+      - name: Verify tag matches package.json version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::tag v${TAG} does not match package.json version ${PKG}"
+            exit 1
+          fi
+          echo "tag v${TAG} matches package.json ${PKG}"
+      - name: Route this publish to public npm (not GitHub Packages)
+        run: npm pkg delete publishConfig.registry
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          PROV=""
+          if [ "${{ github.event.repository.visibility }}" = "public" ]; then
+            PROV="--provenance"
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "Dry run — no publish."
+            npm publish --access public --dry-run
+          else
+            npm publish --access public $PROV
+          fi

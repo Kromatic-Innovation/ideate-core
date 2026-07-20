@@ -35,8 +35,36 @@ npm i ideate-core
 
 Apache-2.0, published to the public npm registry (zero runtime dependencies, Node.js >= 20). Bring your own model client, embedder, and prompts.
 
+**Prerequisite — you supply your own `complete()` model-calling function** (no API
+client is bundled). Two shapes are contractual, and getting either wrong is
+**silently dropped** — you get `candidates: []` with no error thrown:
+
+- **`complete(req)` must resolve to `{ ok: true, text: string }`.** Anything else
+  (a bare string, `{ text }` without `ok: true`, or a thrown error) yields no
+  candidate. `req.prompt` is the string your `buildRound1Prompt` returned.
+- **Each candidate in the model's JSON reply must be shaped `{ text: "..." }`**
+  (a non-empty string `text`) — **not** `{ title, body }`. A bare JSON array, or a
+  `{ candidates | posts | ideas: [...] }` wrapper, are all accepted; any object
+  without a non-empty string `text` is dropped.
+
 ```js
 import { ideateCore } from "ideate-core";
+
+// ── You bring two functions; ideate-core calls YOUR model through them. ──
+
+// 1) complete(req) MUST resolve to { ok: true, text: string }. `text` is the
+//    model's raw reply. Anything else is silently dropped (candidates: []).
+const complete = async (req) => {
+  const text = await callYourModel(req.prompt); // your provider call
+  return { ok: true, text };                    // ← required return shape
+};
+
+// 2) buildRound1Prompt({ context, stance, persona, ... }) returns the prompt
+//    string. Tell the model to reply with candidate objects each shaped
+//    { "text": "..." } — NOT { title, body }.
+const buildRound1Prompt = ({ context, stance }) =>
+  `${stance ?? ""}\nGive 6 ideas for: ${context.brief}.\n` +
+  `Reply ONLY with a JSON array like [{"text": "first idea"}, {"text": "second idea"}].`;
 
 // Single-client panel (the default 5 personas all route to one client):
 const { candidates } = await ideateCore(
@@ -44,7 +72,8 @@ const { candidates } = await ideateCore(
   { complete, buildRound1Prompt /* , buildRound2Prompt, normalizeExtra */ },
 );
 
-// Cross-provider panel — one agent per provider:
+// Cross-provider panel — one agent per provider (each client is its own
+// `complete(req) => { ok: true, text }`, same contract as above):
 const { candidates: pool } = await ideateCore(
   { context: { slug: "demo", brief: "…" } },
   {

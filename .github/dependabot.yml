@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Keep GitHub Actions pinned-SHA references current.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependency"
+    commit-message:
+      prefix: "ci"
+
+  # ideate-core has zero runtime deps; this covers any future devDependencies.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependency"
+    commit-message:
+      prefix: "chore"

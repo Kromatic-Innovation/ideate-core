@@ -1,0 +1,44 @@
+name: Scorecard
+
+# OpenSSF Scorecard — supply-chain security posture. Guarded to run ONLY when the
+# repository is public (Scorecard's SARIF publish + several probes require a
+# public repo); while ideate-core is private the job is skipped, not failed. It
+# activates automatically at go-public. ci-config only.
+
+on:
+  branch_protection_rule:
+  schedule:
+    - cron: "41 6 * * 1"
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    if: ${{ github.event.repository.visibility == 'public' }}
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Run analysis
+        uses: ossf/scorecard-action@f49aabe0b5af0936a0987cfb85d86b75731b0186 # v2.4.1
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5

@@ -1,0 +1,27 @@
+name: Dependency Review
+
+# Blocks a PR that introduces a vulnerable or disallowed-license dependency. The
+# dependency-graph API it reads requires a public repo (or GHAS), so the job is
+# guarded to run only when the repository is public — skipped, not failed, while
+# ideate-core is private. It activates automatically at go-public. ci-config only.
+
+on:
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    if: ${{ github.event.repository.visibility == 'public' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Dependency review
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        with:
+          license-check: true
+          vulnerability-check: true

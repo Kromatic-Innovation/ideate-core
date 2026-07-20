@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./lib/ideate-core.mjs",
-    "./converge": "./lib/converge.mjs"
+    "./converge": "./lib/converge.mjs",
+    "./feedback": "./lib/feedback.mjs"
   },
   "bin": { "ideate": "./bin/ideate.mjs" },
   "files": ["lib", "bin"],

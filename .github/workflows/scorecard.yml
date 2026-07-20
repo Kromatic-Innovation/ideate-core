@@ -2,8 +2,7 @@ name: Scorecard
 
 # OpenSSF Scorecard — supply-chain security posture. Guarded to run ONLY when the
 # repository is public (Scorecard's SARIF publish + several probes require a
-# public repo); while ideate-core is private the job is skipped, not failed. It
-# activates automatically at go-public. ci-config only.
+# public repo). ideate-core is public (flipped 2026-07-20) — this check is active.
 
 on:
   branch_protection_rule:

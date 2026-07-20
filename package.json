@@ -37,6 +37,5 @@
     "url": "https://github.com/Kromatic-Innovation/ideate-core/issues"
   },
   "author": "Kromatic Innovation (https://www.kromatic.com/)",
-  "publishConfig": { "registry": "https://npm.pkg.github.com" },
   "engines": { "node": ">=20" }
 }

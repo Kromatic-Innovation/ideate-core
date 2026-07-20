@@ -4,21 +4,36 @@
 
 ## What it does
 
-Turns a domain context into a pool of idea candidates by prompting a model across several **stance briefs** (e.g. conservative / normal / wacky), optionally running an **expansion round** over the best of round one, and folding in any **human-supplied ideas** so they ride the same downstream gates.
+Turns a domain context into a pool of idea candidates by running a panel of **independent generator agents** (each a separate model call with no shared context — the nominal-group analog), optionally running an **expansion round** over round one, and folding in any **human-supplied ideas** so they ride the same downstream gates.
 
-- **Multi-stance round 1** — one call per stance, so a single stance owns a single call.
+- **Independent multi-agent round 1** — N agents (default 5), each a separate blind model call. Diversity is _engineered_ via per-agent levers — **persona** (default: pragmatist / contrarian / domain-expert / outsider-analogy / visionary), **temperature**, and **prompt strategy** (chain-of-thought). "Be diverse" alone fails; persona beats temperature as a lever (Wang et al. 2023; Meincke et al. 2024).
+- **Cross-provider panel** — route each agent to a different provider/model via an injected `clients` map or `resolveClient` resolver (Anthropic + OpenAI + xAI/Grok + …). No vendor SDK is baked in; heterogeneous models give real variance and sidestep self-preference bias (Wataoka et al. 2024).
 - **Expansion round 2** — feeds round-1 seeds back for a refine/combine/extend pass that emits new candidates.
 - **Human-idea folding** — caller ideas are normalized into the candidate shape and merged; a near-identical human idea wins the dedup tie.
 - **Robust parsing** — tolerates ```json fences, surrounding prose, and `{candidates|ideas|posts:[...]}` wrappers; drops malformed candidates rather than throwing.
-- **Global dedup**, injectable `complete` client (tests stay offline), zero domain code.
+- **Global dedup**, provider-agnostic injectable client (tests stay offline), zero domain code.
 
 ```js
 import { ideateCore } from "@kromatic-innovation/ideate-core";
 
-const { candidates } = await ideateCore({
-  context: { slug: "demo", brief: "ways to promote a launch" },
-  deps: { complete, buildRound1Prompt /* , buildRound2Prompt, normalizeExtra */ },
-});
+// Single-client panel (the default 5 personas all route to one client):
+const { candidates } = await ideateCore(
+  { context: { slug: "demo", brief: "ways to promote a launch" } },
+  { complete, buildRound1Prompt /* , buildRound2Prompt, normalizeExtra */ },
+);
+
+// Cross-provider panel — one agent per provider:
+const { candidates: pool } = await ideateCore(
+  { context: { slug: "demo", brief: "…" } },
+  {
+    buildRound1Prompt,
+    clients: { "claude-x": anthropicComplete, "gpt-x": openaiComplete },
+    agents: [
+      { persona: "pragmatist", model: "claude-x" },
+      { persona: "contrarian", model: "gpt-x" },
+    ],
+  },
+);
 ```
 
 ## Status

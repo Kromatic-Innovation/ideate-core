@@ -19,6 +19,11 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-20
+
+Docs-only patch release: ships the README fixes made after 0.1.0 was published
+so `npm i ideate-core` consumers see the current README (no code changes).
+
 ### Fixed
 
 - **README Quick Start** now documents the two contractual shapes a first
@@ -27,6 +32,12 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
   `{ text: "..." }` (not `{ title, body }`). Getting either wrong is dropped
   silently (`candidates: []`, no error), so the shapes are now shown inline in
   the snippet with a prerequisite callout. (#30)
+
+### Changed
+
+- **README** — added the hero illustration and the use-case / differentiator /
+  WHY framing, and corrected the stale "private for now" status line to reflect
+  the public Apache-2.0 / public-npm release. (docs only.)
 
 ## [0.1.0] - 2026-07-20
 
@@ -48,5 +59,6 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
   Scorecard, Dependabot, dependency-review; pinned SHAs), complete packaging.
 - **Release workflow** — public npm publish on a `v*` tag with provenance.
 
-[Unreleased]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.1.0...develop
+[Unreleased]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.1.1...develop
+[0.1.1]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Kromatic-Innovation/ideate-core/releases/tag/v0.1.0

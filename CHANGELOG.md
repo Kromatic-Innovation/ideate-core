@@ -19,6 +19,15 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ## [Unreleased]
 
+### Fixed
+
+- **README Quick Start** now documents the two contractual shapes a first
+  integration silently trips on: `complete(req)` must resolve to
+  `{ ok: true, text: string }`, and each model-returned candidate must be
+  `{ text: "..." }` (not `{ title, body }`). Getting either wrong is dropped
+  silently (`candidates: []`, no error), so the shapes are now shown inline in
+  the snippet with a prerequisite callout. (#30)
+
 ## [0.1.0] - 2026-07-20
 
 ### Added

@@ -1,6 +1,10 @@
 # ideate-core
 
-**A provider-agnostic ideation _primitive_** — multi-stance divergent generation, an expansion pass, and human-idea folding, as a zero-dependency injectable function. Not a framework, not model-locked: you bring the model client and the prompts.
+[![CI](https://github.com/Kromatic-Innovation/ideate-core/actions/workflows/ci.yml/badge.svg)](https://github.com/Kromatic-Innovation/ideate-core/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![npm](https://img.shields.io/npm/v/@kromatic-innovation/ideate-core.svg)](https://www.npmjs.com/package/@kromatic-innovation/ideate-core)
+
+**A provider-agnostic, evidence-based ideation _engine_** — independent multi-agent generation, blind→pool brainwriting rounds, a divergent→convergent selection half, and an evaluate→regenerate feedback loop, as a zero-dependency injectable function. Not a framework, not model-locked: you bring the model client, the embedder, and the prompts.
 
 ## What it does
 
@@ -59,4 +63,4 @@ hypotheses to test with people, not answers.
 
 ## Status
 
-Early. Extracted from an internal ideation engine (Kromatic-Innovation cwc#1320 S2 / cwc#737). **Private for now, with the intent to open-source once it earns it.** The configurable multi-agent engine (independent generators + blind→pool build-on rounds, nominal-group / brainwriting style), the divergent→convergent selection half, and the generate→evaluate→regenerate feedback loop are all now implemented — see the method doc above. Apache-2.0.
+Early. Extracted from an internal Kromatic ideation engine. **Private for now, with the intent to open-source once it earns it.** The configurable multi-agent engine (independent generators + blind→pool build-on rounds, nominal-group / brainwriting style), the divergent→convergent selection half, and the generate→evaluate→regenerate feedback loop are all now implemented — see the method doc above. Apache-2.0.

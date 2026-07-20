@@ -37,6 +37,26 @@ Requires Node.js >= 20.
 4. Ensure `npm test` is green and `npm pack --dry-run` is clean.
 5. Open the PR against `develop`; describe the change and link any issue.
 
+## Releasing (maintainers)
+
+`ideate-core` follows [Semantic Versioning](https://semver.org/) and is **pre-1.0
+(0.x)** — while the major version is `0`, a **minor** bump may include breaking
+changes and a **patch** bump is backward-compatible fixes only. See
+[`CHANGELOG.md`](CHANGELOG.md).
+
+To cut a release:
+
+1. Move the `[Unreleased]` entries in `CHANGELOG.md` under a new `vX.Y.Z` heading.
+2. Bump `version` in `package.json` to match.
+3. Tag it: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+4. The [release workflow](.github/workflows/release.yml) verifies the tag matches
+   `package.json`, runs the tests, and publishes to **public npm** with
+   `--access public` (and provenance, once the repo is public).
+
+Validate the packaging any time without publishing via the workflow's manual
+**dry-run** (`workflow_dispatch`, `dry_run: true`) or locally with
+`npm publish --dry-run`.
+
 ## Reporting bugs / requesting features
 
 Use the issue templates. For anything security-sensitive, follow

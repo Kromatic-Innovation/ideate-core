@@ -19,6 +19,14 @@ Turns a domain context into a pool of idea candidates by running a panel of **in
 - **Evaluate→regenerate feedback loop** (opt-in, `@kromatic-innovation/ideate-core/feedback`) — a Delphi-style controlled-feedback loop (Dalkey & Helmer 1963): an **injected external evaluator** (`plenum` is the intended first one) critiques the pool, and only the flagged ideas are **targeted-regenerated** against their specific `dealKillers`/`keepReasons`; `keep` passes, `kill` drops, `revise` regenerates, then the pool re-dedupes. The evaluator model must differ from the generators (self-preference bias — Wataoka et al. 2024).
 - **Global dedup**, provider-agnostic injectable client + embedder (tests stay offline), zero domain code.
 
+## Install
+
+```bash
+npm i @kromatic-innovation/ideate-core
+```
+
+Apache-2.0, published to the public npm registry (zero runtime dependencies, Node.js >= 20). Bring your own model client, embedder, and prompts.
+
 ```js
 import { ideateCore } from "@kromatic-innovation/ideate-core";
 

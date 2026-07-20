@@ -4,6 +4,14 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/ideate-core.svg)](https://www.npmjs.com/package/ideate-core)
 
+![ideate-core: three people building ideas together at a whiteboard covered in post-its](docs/assets/hero.png)
+
+**Use case:** you need a pool of genuinely different ideas from an LLM — for a campaign brief, a product-naming pass, a strategy option set — not five rephrasings of the same idea with the temperature turned up.
+
+**Differentiator:** most "ideation" wrappers are one model call with a "be creative" system prompt. ideate-core runs independent, blind generator agents (persona is the diversity lever, not temperature — the research backs this), pools them through real brainwriting-style build-on rounds, and optionally converges the pool with embedding-dedup + split-axis scoring instead of one LLM-judge "best idea." It's a zero-dependency injectable function, not a framework — bring your own model client.
+
+**Why:** "ask the model for 5 ideas" reliably produces 5 idea *phrasings*. Real divergence needs engineered diversity (independent agents, personas, blind-then-pool rounds) the same way human brainwriting does — this package is that method, packaged as a library instead of a one-off prompt.
+
 **A provider-agnostic, evidence-based ideation _engine_** — independent multi-agent generation, blind→pool brainwriting rounds, a divergent→convergent selection half, and an evaluate→regenerate feedback loop, as a zero-dependency injectable function. Not a framework, not model-locked: you bring the model client, the embedder, and the prompts.
 
 ## What it does

@@ -38,6 +38,25 @@ const { candidates: pool } = await ideateCore(
 );
 ```
 
+## How it works (and why)
+
+`ideate-core` is not "ask a model for ideas" — it is a small **evidence-based**
+pipeline drawn from six decades of human-creativity research and the recent
+LLM-ideation literature. It **diverges then converges**: independent multi-agent
+generation (the nominal-group analog), blind→pool build-on rounds (brainwriting),
+then embedding dedup + clustering + split novelty/feasibility selection + human
+rerank, with an optional Delphi-style evaluate→regenerate loop.
+
+Every design decision — and every default — is justified by a cited finding in
+**[docs/ideation-method.md](docs/ideation-method.md)** (author + year + URL, plus
+a "defaults & their evidence" table). Start there to understand *why* the engine
+is shaped this way.
+
+**Honesty note:** synthetic ideation is a **drafting aid, not a substitute for
+real customer discovery.** The pipeline widens and sharpens the option space; it
+does not tell you what is true about your market. Treat its shortlist as
+hypotheses to test with people, not answers.
+
 ## Status
 
-Early. Extracted from an internal ideation engine (Kromatic-Innovation cwc#1320 S2 / cwc#737). **Private for now, with the intent to open-source once it earns it** — the roadmap is a configurable multi-agent engine (independent generators + a build-on round, nominal-group / brainwriting style) plus a generate→evaluate→regenerate feedback loop. Apache-2.0.
+Early. Extracted from an internal ideation engine (Kromatic-Innovation cwc#1320 S2 / cwc#737). **Private for now, with the intent to open-source once it earns it.** The configurable multi-agent engine (independent generators + blind→pool build-on rounds, nominal-group / brainwriting style), the divergent→convergent selection half, and the generate→evaluate→regenerate feedback loop are all now implemented — see the method doc above. Apache-2.0.

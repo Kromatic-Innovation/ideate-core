@@ -1,0 +1,160 @@
+name: Promote Main
+
+# Deliberate, human-triggered develop -> main promotion. ideate-core is a
+# 2-tier npm library: develop is integration, main is the ref that downstream
+# repos install from (via GitHub Packages / git ref). There is no staging env
+# and no launchd deploy-guard checkout here — this is a plain private npm
+# package consumed by social-loop and the cwc ideation skill.
+#
+# Gated on a completed, successful CI run for the exact SHA being promoted
+# (push event on develop), then fast-forwards main via the refs API with
+# force=false — never a force-push. Mirrors the pattern in
+# Kromatic-Innovation/google-workspace-mcp-kernel's promote-main.yml, adapted
+# for this repo's `CI` workflow (job `CI Required`, .github/workflows/ci.yml)
+# and npm-library consume model.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "SHA on develop to promote (default: current develop tip)"
+        required: false
+      reason:
+        description: Promotion reason for audit trail
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+  statuses: read
+
+jobs:
+  promote:
+    name: Fast-forward Promote to Main
+    runs-on: ubuntu-latest
+    env:
+      PROMOTION_REASON: ${{ github.event.inputs.reason }}
+      REQUESTED_SHA: ${{ github.event.inputs.sha }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve promoted SHA and verify develop ancestry
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin develop main
+
+          if [ -n "${REQUESTED_SHA}" ]; then
+            SOURCE_SHA="${REQUESTED_SHA}"
+          else
+            SOURCE_SHA="$(git rev-parse origin/develop)"
+          fi
+          TARGET_SHA="$(git rev-parse origin/main)"
+
+          if ! git merge-base --is-ancestor "$SOURCE_SHA" origin/develop; then
+            echo "::error::${SOURCE_SHA} is not an ancestor of develop."
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "$TARGET_SHA" "$SOURCE_SHA"; then
+            echo "::error::Fast-forward precondition failed: main is not an ancestor of the promoted SHA."
+            exit 1
+          fi
+
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "target_sha=$TARGET_SHA" >> "$GITHUB_ENV"
+
+      - name: Require successful develop CI run for the promoted SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "Waiting for a completed, successful 'CI' run on develop @ ${source_sha}..."
+          for i in $(seq 1 30); do
+            run_json=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${source_sha}&branch=develop&event=push" --jq '.workflow_runs[0] // empty')
+            if [ -n "$run_json" ]; then
+              status=$(echo "$run_json" | jq -r '.status')
+              conclusion=$(echo "$run_json" | jq -r '.conclusion')
+              if [ "$status" = "completed" ]; then
+                if [ "$conclusion" = "success" ]; then
+                  echo "develop CI succeeded for ${source_sha}."
+                  break
+                fi
+                echo "::error::develop CI run for ${source_sha} completed with conclusion '${conclusion}'."
+                exit 1
+              fi
+              echo "  ($i/30) CI run status=${status}; waiting 30s..."
+            else
+              echo "  ($i/30) no CI push run found yet for ${source_sha}; waiting 30s..."
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "::error::Timed out waiting for a successful develop CI run for ${source_sha}."
+              exit 1
+            fi
+            sleep 30
+          done
+
+      - name: Load workflow-bot App credentials from 1Password
+        uses: 1password/load-secrets-action@v4
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          KROMATIC_WORKFLOW_BOT_APP_ID: op://Infrastructure/kromatic-workflow-bot/app-id
+          KROMATIC_WORKFLOW_BOT_PRIVATE_KEY: op://Infrastructure/kromatic-workflow-bot/private-key
+
+      - name: Mint GitHub App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ env.KROMATIC_WORKFLOW_BOT_APP_ID }}
+          private-key: ${{ env.KROMATIC_WORKFLOW_BOT_PRIVATE_KEY }}
+
+      - name: Validate promotion push token
+        env:
+          PROMOTION_PUSH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PROMOTION_PUSH_TOKEN:-}" ]; then
+            echo "::error::App-minted promotion token is empty; GitHub App token minting likely failed."
+            exit 1
+          fi
+
+      - name: Push fast-forward promotion as bot
+        env:
+          PROMOTION_PUSH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          update_payload=$(jq -nc --arg sha "$source_sha" '{sha:$sha,force:false}')
+          update_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/git/refs/heads/main"
+          http_status=$(curl -sS -o /tmp/promote_main_ref_update.json -w "%{http_code}" -L -X PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${PROMOTION_PUSH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$update_url" \
+            -d "$update_payload")
+          if [ "$http_status" != "200" ]; then
+            echo "::error::Failed to fast-forward main to ${source_sha} via refs API (HTTP ${http_status})."
+            cat /tmp/promote_main_ref_update.json
+            exit 1
+          fi
+
+      - name: Write promotion audit summary
+        run: |
+          {
+            echo "## Main Promotion"
+            echo "- repository: \`${GITHUB_REPOSITORY}\`"
+            echo "- initiated_by: \`${GITHUB_ACTOR}\`"
+            echo "- promoted_sha: \`${source_sha}\`"
+            echo "- reason: ${PROMOTION_REASON}"
+            echo "- run_url: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo ""
+            echo "main is now at this SHA. There is no deploy-guard checkout for this"
+            echo "repo — pick it up locally with:"
+            echo ""
+            echo '```'
+            echo "git fetch origin main && git checkout main && git merge --ff-only origin/main && npm ci"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

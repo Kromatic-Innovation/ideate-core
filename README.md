@@ -11,7 +11,8 @@ Turns a domain context into a pool of idea candidates by running a panel of **in
 - **Build-on rounds with a sharing policy** — round 1 is blind; build-on rounds (2+) default to **pool** sharing: agents build on the **shared, deduped** pool, not their own seeds — real brainwriting / 6-3-5 (Rohrbach 1968; Paulus & Yang 2000). Dedupe-before-share is mandatory for pool rounds (a raw pool triggers fixation — Kohn & Smith 2011). Per-round `sharing`, `incubation`, `buildOnDirective`, and `maxRounds` are all config-driven.
 - **Human-idea folding** — caller ideas are normalized into the candidate shape and merged; a near-identical human idea wins the dedup tie.
 - **Robust parsing** — tolerates ```json fences, surrounding prose, and `{candidates|ideas|posts:[...]}` wrappers; drops malformed candidates rather than throwing.
-- **Global dedup**, provider-agnostic injectable client (tests stay offline), zero domain code.
+- **Convergence** (opt-in, `@kromatic-innovation/ideate-core/converge`) — the divergent→convergent second half: **embedding-cosine dedup** (default 0.83; collapses semantic near-dups a text key misses), **clustering** (k auto) so selection samples _across_ themes, **split-axis scoring** (novelty ⟂ feasibility, never one "best" — Rietzschel et al. 2010), a **cross-cluster shortlist**, a **human-rerank hook** (LLM-judge is a filter, not a novelty ranker — Zheng et al. 2023), and a **diversity metric** vs a floor. The embedder is injected (offline-mockable).
+- **Global dedup**, provider-agnostic injectable client + embedder (tests stay offline), zero domain code.
 
 ```js
 import { ideateCore } from "@kromatic-innovation/ideate-core";

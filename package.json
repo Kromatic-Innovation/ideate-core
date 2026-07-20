@@ -4,7 +4,10 @@
   "description": "A provider-agnostic ideation primitive: multi-stance divergent generation, an expansion pass, and human-idea folding — as a zero-dependency injectable function. Bring your own model and prompts.",
   "license": "Apache-2.0",
   "type": "module",
-  "exports": { ".": "./lib/ideate-core.mjs" },
+  "exports": {
+    ".": "./lib/ideate-core.mjs",
+    "./converge": "./lib/converge.mjs"
+  },
   "bin": { "ideate": "./bin/ideate.mjs" },
   "files": ["lib", "bin"],
   "scripts": {

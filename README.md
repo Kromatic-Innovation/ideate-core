@@ -79,4 +79,4 @@ hypotheses to test with people, not answers.
 
 ## Status
 
-Early. Extracted from an internal Kromatic ideation engine. **Private for now, with the intent to open-source once it earns it.** The configurable multi-agent engine (independent generators + blind→pool build-on rounds, nominal-group / brainwriting style), the divergent→convergent selection half, and the generate→evaluate→regenerate feedback loop are all now implemented — see the method doc above. Apache-2.0.
+Extracted from an internal Kromatic ideation engine, now open source (Apache-2.0) and published to public npm. The configurable multi-agent engine (independent generators + blind→pool build-on rounds, nominal-group / brainwriting style), the divergent→convergent selection half, and the generate→evaluate→regenerate feedback loop are all now implemented — see the method doc above. Apache-2.0.

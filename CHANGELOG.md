@@ -19,6 +19,20 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ## [Unreleased]
 
+### Changed
+
+- **README** — polished per the zenodotus gate re-run (#38, docs only): tightened
+  the top-of-file preamble (folded the redundant "Why" paragraph into the
+  differentiator), added a bibliography pointer to
+  [`docs/ideation-method.md`](docs/ideation-method.md#references) where the research
+  claims first appear, and reframed the "Status" section as **feature-complete but
+  pre-1.0 (0.x)** with the API-stability caveat surfaced inline.
+
+### Fixed
+
+- **NOTICE** copyright year corrected to 2026 to match `LICENSE` and the repo's
+  publish year. (#38)
+
 ## [0.1.1] - 2026-07-20
 
 Docs-only patch release: ships the README fixes made after 0.1.0 was published

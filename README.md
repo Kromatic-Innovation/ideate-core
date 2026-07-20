@@ -8,15 +8,15 @@
 
 **Use case:** you need a pool of genuinely different ideas from an LLM — for a campaign brief, a product-naming pass, a strategy option set — not five rephrasings of the same idea with the temperature turned up.
 
-**Differentiator:** most "ideation" wrappers are one model call with a "be creative" system prompt. ideate-core runs independent, blind generator agents (persona is the diversity lever, not temperature — the research backs this), pools them through real brainwriting-style build-on rounds, and optionally converges the pool with embedding-dedup + split-axis scoring instead of one LLM-judge "best idea." It's a zero-dependency injectable function, not a framework — bring your own model client.
-
-**Why:** "ask the model for 5 ideas" reliably produces 5 idea *phrasings*. Real divergence needs engineered diversity (independent agents, personas, blind-then-pool rounds) the same way human brainwriting does — this package is that method, packaged as a library instead of a one-off prompt.
+**Differentiator:** most "ideation" wrappers are one model call with a "be creative" system prompt. "Ask the model for 5 ideas" reliably produces 5 idea *phrasings*. ideate-core instead engineers the diversity the way human brainwriting does: independent, blind generator agents (persona is the lever, not temperature — the research backs this), pooled through real build-on rounds, then optionally converged with embedding-dedup + split-axis scoring instead of one LLM-judge "best idea." It's a zero-dependency injectable function, not a framework — bring your own model client.
 
 **A provider-agnostic, evidence-based ideation _engine_** — independent multi-agent generation, blind→pool brainwriting rounds, a divergent→convergent selection half, and an evaluate→regenerate feedback loop, as a zero-dependency injectable function. Not a framework, not model-locked: you bring the model client, the embedder, and the prompts.
 
 ## What it does
 
 Turns a domain context into a pool of idea candidates by running a panel of **independent generator agents** (each a separate model call with no shared context — the nominal-group analog), optionally running an **expansion round** over round one, and folding in any **human-supplied ideas** so they ride the same downstream gates.
+
+> Every research claim below (Wang et al. 2023, Meincke et al. 2024, Rohrbach 1968, …) is sourced in full — author + year + URL — in **[docs/ideation-method.md](docs/ideation-method.md#references)**, alongside a defaults→evidence table.
 
 - **Independent multi-agent round 1** — N agents (default 5), each a separate blind model call. Diversity is _engineered_ via per-agent levers — **persona** (default: pragmatist / contrarian / domain-expert / outsider-analogy / visionary), **temperature**, and **prompt strategy** (chain-of-thought). "Be diverse" alone fails; persona beats temperature as a lever (Wang et al. 2023; Meincke et al. 2024).
 - **Cross-provider panel** — route each agent to a different provider/model via an injected `clients` map or `resolveClient` resolver (Anthropic + OpenAI + xAI/Grok + …). No vendor SDK is baked in; heterogeneous models give real variance and sidestep self-preference bias (Wataoka et al. 2024).
@@ -125,4 +125,6 @@ hypotheses to test with people, not answers.
 
 ## Status
 
-Extracted from an internal Kromatic ideation engine, now open source (Apache-2.0) and published to public npm. The configurable multi-agent engine (independent generators + blind→pool build-on rounds, nominal-group / brainwriting style), the divergent→convergent selection half, and the generate→evaluate→regenerate feedback loop are all now implemented — see the method doc above. Apache-2.0.
+Extracted from an internal Kromatic ideation engine, now open source (Apache-2.0) and published to public npm. The configurable multi-agent engine (independent generators + blind→pool build-on rounds, nominal-group / brainwriting style), the divergent→convergent selection half, and the generate→evaluate→regenerate feedback loop are all implemented (feature-complete) — see the method doc above.
+
+**Stability:** `ideate-core` is **pre-1.0 (0.x)** — feature-complete, but the public API may still change before 1.0 (per the [versioning convention](CHANGELOG.md#versioning-convention): while the major version is `0`, a `0.x.0` minor may carry breaking changes). See [SECURITY.md](SECURITY.md) and [CONTRIBUTING.md](CONTRIBUTING.md); the exact published version is shown by the npm badge above.

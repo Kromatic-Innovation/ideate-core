@@ -19,6 +19,8 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-20
+
 ### Added
 
 - **Independent multi-agent round 1** (S1) — N independent generator agents
@@ -37,7 +39,5 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
   Scorecard, Dependabot, dependency-review; pinned SHAs), complete packaging.
 - **Release workflow** — public npm publish on a `v*` tag with provenance.
 
-_This is the pre-1.0 groundwork; no version has been published yet. The first
-tagged release will move these entries under its version heading._
-
-[Unreleased]: https://github.com/Kromatic-Innovation/ideate-core/commits/develop
+[Unreleased]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.1.0...develop
+[0.1.0]: https://github.com/Kromatic-Innovation/ideate-core/releases/tag/v0.1.0

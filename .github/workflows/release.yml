@@ -7,9 +7,16 @@ name: Release
 # `--access public`. npm provenance is enabled when the repo is public
 # (provenance requires a public repo); while private it is skipped.
 #
-# The NPM_TOKEN secret is human-provisioned (a granular automation token scoped
-# to the @kromatic-innovation org, publish rights). The first LIVE publish
-# happens at the open-sourcing gate; until then use the manual dry-run.
+# Auth is npm Trusted Publishing (OIDC) — no NPM_TOKEN secret, no long-lived
+# credential anywhere. `id-token: write` below lets npm CLI >=11.5.1 mint a
+# short-lived OIDC token and exchange it with the registry at publish time.
+# This requires a one-time bootstrap: npm's Trusted Publisher can only be
+# attached to a package that already exists, so the FIRST publish for a new
+# package must be a manual `npm publish` from a maintainer's logged-in
+# machine; every release after that runs through this workflow with zero
+# stored secrets. See tickle-stick's release.yml for the working reference
+# (confirmed via its CI logs: "Signed provenance statement ... from GitHub
+# Actions", no NPM_TOKEN present anywhere).
 
 on:
   push:
@@ -54,8 +61,6 @@ jobs:
       - name: Route this publish to public npm (not GitHub Packages)
         run: npm pkg delete publishConfig.registry
       - name: Publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           PROV=""

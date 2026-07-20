@@ -55,9 +55,17 @@ so `npm i ideate-core` consumers see the current README (no code changes).
   controlled feedback with a per-idea feedback-in contract and a panelist adapter.
 - **Research-backed method doc** (S5) — `docs/ideation-method.md` with cited
   rationale + a defaults→evidence table.
+
+### Added — OSS packaging & release infra
+
 - **OSS-readiness** — community health files, security workflows (TruffleHog,
   Scorecard, Dependabot, dependency-review; pinned SHAs), complete packaging.
 - **Release workflow** — public npm publish on a `v*` tag with provenance.
+
+### Chore
+
+- Routine GitHub Actions dependency bumps via Dependabot (`8e45570`, `5176681`,
+  `1ec8072`, `d92fd94`, `fe05196`, `391ae3a`).
 
 [Unreleased]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.1.1...develop
 [0.1.1]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.1.0...v0.1.1

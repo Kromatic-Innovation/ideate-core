@@ -87,6 +87,23 @@ const { candidates: pool } = await ideateCore(
 );
 ```
 
+## CLI
+
+A thin standalone CLI (`bin/ideate.mjs`, installed as `ideate`) wraps the same
+engine for shell/pipeline use:
+
+```bash
+echo '{"context":{"slug":"demo"},"humanIdeas":["a seed idea"]}' \
+  | ideate --adapter ./my-adapter.mjs   # ESM module exporting `deps` for ideateCore
+
+ideate --version   # print the installed version
+ideate --help      # full usage
+```
+
+Without `--adapter` the CLI runs **fold-only**: it folds `humanIdeas` from stdin
+and prints them, no model client or API key required — useful for sanity-checking
+the human-idea path before wiring a real adapter.
+
 ## How it works (and why)
 
 `ideate-core` is not "ask a model for ideas" — it is a small **evidence-based**

@@ -1,0 +1,19 @@
+{
+  "name": "@kromatic-innovation/ideate-core",
+  "version": "0.0.0",
+  "description": "A provider-agnostic ideation primitive: multi-stance divergent generation, an expansion pass, and human-idea folding — as a zero-dependency injectable function. Bring your own model and prompts.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": { ".": "./lib/ideate-core.mjs" },
+  "bin": { "ideate": "./bin/ideate.mjs" },
+  "files": ["lib", "bin"],
+  "scripts": {
+    "test": "node --test lib/*.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kromatic-Innovation/ideate-core.git"
+  },
+  "publishConfig": { "registry": "https://npm.pkg.github.com" },
+  "engines": { "node": ">=20" }
+}

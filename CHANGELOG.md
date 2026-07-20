@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `@kromatic-innovation/ideate-core` are documented here.
+All notable changes to `ideate-core` are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -32,7 +32,7 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
   (k auto), split novelty/feasibility selection, cross-cluster shortlist,
   human-rerank hook, diversity metric.
 - **Evaluate→regenerate feedback loop** (S4, `./feedback`) — Delphi-style
-  controlled feedback with a per-idea feedback-in contract and a plenum adapter.
+  controlled feedback with a per-idea feedback-in contract and a panelist adapter.
 - **Research-backed method doc** (S5) — `docs/ideation-method.md` with cited
   rationale + a defaults→evidence table.
 - **OSS-readiness** — community health files, security workflows (TruffleHog,

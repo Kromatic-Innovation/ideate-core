@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Kromatic-Innovation/ideate-core/actions/workflows/ci.yml/badge.svg)](https://github.com/Kromatic-Innovation/ideate-core/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![npm](https://img.shields.io/npm/v/@kromatic-innovation/ideate-core.svg)](https://www.npmjs.com/package/@kromatic-innovation/ideate-core)
+[![npm](https://img.shields.io/npm/v/ideate-core.svg)](https://www.npmjs.com/package/ideate-core)
 
 **A provider-agnostic, evidence-based ideation _engine_** — independent multi-agent generation, blind→pool brainwriting rounds, a divergent→convergent selection half, and an evaluate→regenerate feedback loop, as a zero-dependency injectable function. Not a framework, not model-locked: you bring the model client, the embedder, and the prompts.
 
@@ -15,20 +15,20 @@ Turns a domain context into a pool of idea candidates by running a panel of **in
 - **Build-on rounds with a sharing policy** — round 1 is blind; build-on rounds (2+) default to **pool** sharing: agents build on the **shared, deduped** pool, not their own seeds — real brainwriting / 6-3-5 (Rohrbach 1968; Paulus & Yang 2000). Dedupe-before-share is mandatory for pool rounds (a raw pool triggers fixation — Kohn & Smith 2011). Per-round `sharing`, `incubation`, `buildOnDirective`, and `maxRounds` are all config-driven.
 - **Human-idea folding** — caller ideas are normalized into the candidate shape and merged; a near-identical human idea wins the dedup tie.
 - **Robust parsing** — tolerates ```json fences, surrounding prose, and `{candidates|ideas|posts:[...]}` wrappers; drops malformed candidates rather than throwing.
-- **Convergence** (opt-in, `@kromatic-innovation/ideate-core/converge`) — the divergent→convergent second half: **embedding-cosine dedup** (default 0.83; collapses semantic near-dups a text key misses), **clustering** (k auto) so selection samples _across_ themes, **split-axis scoring** (novelty ⟂ feasibility, never one "best" — Rietzschel et al. 2010), a **cross-cluster shortlist**, a **human-rerank hook** (LLM-judge is a filter, not a novelty ranker — Zheng et al. 2023), and a **diversity metric** vs a floor. The embedder is injected (offline-mockable).
-- **Evaluate→regenerate feedback loop** (opt-in, `@kromatic-innovation/ideate-core/feedback`) — a Delphi-style controlled-feedback loop (Dalkey & Helmer 1963): an **injected external evaluator** (`plenum` is the intended first one) critiques the pool, and only the flagged ideas are **targeted-regenerated** against their specific `dealKillers`/`keepReasons`; `keep` passes, `kill` drops, `revise` regenerates, then the pool re-dedupes. The evaluator model must differ from the generators (self-preference bias — Wataoka et al. 2024).
+- **Convergence** (opt-in, `ideate-core/converge`) — the divergent→convergent second half: **embedding-cosine dedup** (default 0.83; collapses semantic near-dups a text key misses), **clustering** (k auto) so selection samples _across_ themes, **split-axis scoring** (novelty ⟂ feasibility, never one "best" — Rietzschel et al. 2010), a **cross-cluster shortlist**, a **human-rerank hook** (LLM-judge is a filter, not a novelty ranker — Zheng et al. 2023), and a **diversity metric** vs a floor. The embedder is injected (offline-mockable).
+- **Evaluate→regenerate feedback loop** (opt-in, `ideate-core/feedback`) — a Delphi-style controlled-feedback loop (Dalkey & Helmer 1963): an **injected external evaluator** (`panelist` is the intended first one) critiques the pool, and only the flagged ideas are **targeted-regenerated** against their specific `dealKillers`/`keepReasons`; `keep` passes, `kill` drops, `revise` regenerates, then the pool re-dedupes. The evaluator model must differ from the generators (self-preference bias — Wataoka et al. 2024).
 - **Global dedup**, provider-agnostic injectable client + embedder (tests stay offline), zero domain code.
 
 ## Install
 
 ```bash
-npm i @kromatic-innovation/ideate-core
+npm i ideate-core
 ```
 
 Apache-2.0, published to the public npm registry (zero runtime dependencies, Node.js >= 20). Bring your own model client, embedder, and prompts.
 
 ```js
-import { ideateCore } from "@kromatic-innovation/ideate-core";
+import { ideateCore } from "ideate-core";
 
 // Single-client panel (the default 5 personas all route to one client):
 const { candidates } = await ideateCore(

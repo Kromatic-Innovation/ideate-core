@@ -1,6 +1,6 @@
 name: Release
 
-# Publish @kromatic-innovation/ideate-core to the PUBLIC npm registry (Apache-2.0)
+# Publish ideate-core to the PUBLIC npm registry (Apache-2.0)
 # on a v* tag. This is DISTINCT from the internal GitHub Packages publish
 # (package.json `publishConfig.registry`): this job deletes that publishConfig
 # entry in-CI so the release targets npmjs.org, and publishes with

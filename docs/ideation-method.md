@@ -140,7 +140,7 @@ rounds — which improves group judgment over one-shot elicitation (Dalkey &
 Helmer 1963; Rowe & Wright 1999). Targeting regeneration to the specific
 `dealKillers`/`keepReasons` is what makes the second pass better rather than just
 different. The evaluator must be a **different model** from the generators to
-avoid self-preference bias (Wataoka et al. 2024). Kromatic's `plenum` is the
+avoid self-preference bias (Wataoka et al. 2024). Kromatic's `panelist` is the
 intended first evaluator; the engine ships an adapter for its shipped deal-killer
 contract but stays evaluator-agnostic.
 

@@ -3,8 +3,9 @@ name: Promote Main
 # Deliberate, human-triggered develop -> main promotion. ideate-core is a
 # 2-tier npm library: develop is integration, main is the ref that downstream
 # repos install from (via GitHub Packages / git ref). There is no staging env
-# and no launchd deploy-guard checkout here — this is a plain private npm
-# package consumed by social-loop and the cwc ideation skill.
+# and no launchd deploy-guard checkout here — this is a plain public npm
+# package (live on the public npm registry) consumed by social-loop and the
+# cwc ideation skill.
 #
 # Gated on a completed, successful CI run for the exact SHA being promoted
 # (push event on develop), then fast-forwards main via the refs API with

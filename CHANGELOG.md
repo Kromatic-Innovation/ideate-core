@@ -19,6 +19,17 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ## [Unreleased]
 
+### Removed
+
+- **Legacy temperature-stance panel** (#46) — dropped the pre-S1
+  `deps.temperatures` back-compat path and its exported constants
+  (`DEFAULT_TEMPERATURES`, `DEFAULT_TEMPERATURE_STANCE`) plus the internal
+  temperature-derived agent panel in `resolveAgents`. There is no pre-1.0 public
+  release for it to be compatible with, so it was dead scaffolding; use the
+  supported `deps.agents` panel (or the default persona panel) instead. Breaking
+  only for a caller that passed `deps.temperatures`, which no first-release
+  consumer can have.
+
 ### Changed
 
 - **Security docs** (#45, docs only) — `SECURITY.md` now calls out the CLI

@@ -24,7 +24,7 @@
     "./feedback": "./lib/feedback.mjs"
   },
   "bin": { "ideate": "bin/ideate.mjs" },
-  "files": ["lib", "bin", "docs", "NOTICE", "!lib/*.test.mjs"],
+  "files": ["lib", "bin", "docs", "NOTICE", "!lib/*.test.mjs", "!docs/assets/hero.png"],
   "scripts": {
     "test": "node --test lib/*.test.mjs"
   },

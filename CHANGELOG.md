@@ -24,6 +24,11 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 > does: #46 removed the `deps.temperatures` back-compat path and its exported
 > constants, which is breaking against the published `0.1.0` artifact. The
 > heading stays `- Unreleased` (undated) until a `v0.2.0` tag is actually cut.
+>
+> The docs-only changes previously staged under a dated `[0.1.1] - 2026-07-20`
+> heading are folded in below: **no `v0.1.1` tag was ever cut and only `0.1.0`
+> is on the registry**, so that entry claimed a release that never shipped.
+> Those changes ship with `0.2.0`.
 
 ### Chore
 
@@ -64,31 +69,20 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
   [`docs/ideation-method.md`](docs/ideation-method.md#references) where the research
   claims first appear, and reframed the "Status" section as **feature-complete but
   pre-1.0 (0.x)** with the API-stability caveat surfaced inline.
+- **README** — added the hero illustration and the use-case / differentiator /
+  WHY framing, and corrected the stale "private for now" status line to reflect
+  the public Apache-2.0 / public-npm release. (docs only.)
 
 ### Fixed
 
 - **NOTICE** copyright year corrected to 2026 to match `LICENSE` and the repo's
   publish year. (#38)
-
-## [0.1.1] - 2026-07-20
-
-Docs-only patch release: ships the README fixes made after 0.1.0 was published
-so `npm i ideate-core` consumers see the current README (no code changes).
-
-### Fixed
-
 - **README Quick Start** now documents the two contractual shapes a first
   integration silently trips on: `complete(req)` must resolve to
   `{ ok: true, text: string }`, and each model-returned candidate must be
   `{ text: "..." }` (not `{ title, body }`). Getting either wrong is dropped
   silently (`candidates: []`, no error), so the shapes are now shown inline in
   the snippet with a prerequisite callout. (#30)
-
-### Changed
-
-- **README** — added the hero illustration and the use-case / differentiator /
-  WHY framing, and corrected the stale "private for now" status line to reflect
-  the public Apache-2.0 / public-npm release. (docs only.)
 
 ## [0.1.0] - 2026-07-20
 
@@ -121,5 +115,4 @@ Packaging & release infrastructure (no engine behavior):
   `1ec8072`, `d92fd94`, `fe05196`, `391ae3a`).
 
 [0.2.0]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.1.0...develop
-[0.1.1]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Kromatic-Innovation/ideate-core/releases/tag/v0.1.0

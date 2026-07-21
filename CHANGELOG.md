@@ -19,6 +19,14 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ## [Unreleased]
 
+### Chore
+
+- **Packaging** (#47) — exclude `docs/assets/hero.png` (~1.5 MB) from the
+  published npm tarball via `package.json` `files`. The hero image renders on the
+  GitHub README from the git-hosted path and has no runtime purpose for an npm
+  consumer; dropping it shrinks the tarball from ~1.3 MB to ~31 kB (the package
+  markets itself as zero-dependency). No effect on the README image on GitHub.
+
 ### Removed
 
 - **Legacy temperature-stance panel** (#46) — dropped the pre-S1

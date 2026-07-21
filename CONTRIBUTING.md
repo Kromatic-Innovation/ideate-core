@@ -57,6 +57,13 @@ Validate the packaging any time without publishing via the workflow's manual
 **dry-run** (`workflow_dispatch`, `dry_run: true`) or locally with
 `npm publish --dry-run`.
 
+**Rolling back a bad release.** npm forbids re-publishing a version once
+unpublished, and unpublish is only allowed within 72 hours of publish. So
+**prefer deprecation** over unpublish: `npm deprecate ideate-core@<version> "<reason — e.g. superseded by <next-version>>"`
+warns installers without breaking existing pins, then cut a fixed `<next-version>`.
+Reserve `npm unpublish ideate-core@<version>` for a genuinely broken/leaked
+publish inside the 72-hour window.
+
 ## Reporting bugs / requesting features
 
 Use the issue templates. For anything security-sensitive, follow

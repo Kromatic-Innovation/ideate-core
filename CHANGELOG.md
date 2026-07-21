@@ -21,6 +21,13 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ### Changed
 
+- **Docs hygiene** (#44, docs only) — split the `[0.1.0]` changelog so engine
+  features (`### Added`) and packaging/CI (`### Infra`/`### Chore`) read
+  separately; added a release rollback/yank pointer to
+  [`CONTRIBUTING.md`](CONTRIBUTING.md) (`npm deprecate`, with the 72-hour
+  unpublish caveat); and deduped the why/evidence narrative so the README's
+  "How it works" is a short pointer and [`docs/ideation-method.md`](docs/ideation-method.md)
+  is the single source of truth.
 - **README** — polished per the zenodotus gate re-run (#38, docs only): tightened
   the top-of-file preamble (folded the redundant "Why" paragraph into the
   differentiator), added a bibliography pointer to
@@ -70,7 +77,9 @@ so `npm i ideate-core` consumers see the current README (no code changes).
 - **Research-backed method doc** (S5) — `docs/ideation-method.md` with cited
   rationale + a defaults→evidence table.
 
-### Added — OSS packaging & release infra
+### Infra
+
+Packaging & release infrastructure (no engine behavior):
 
 - **OSS-readiness** — community health files, security workflows (TruffleHog,
   Scorecard, Dependabot, dependency-review; pinned SHAs), complete packaging.

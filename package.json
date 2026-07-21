@@ -1,6 +1,6 @@
 {
   "name": "ideate-core",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A provider-agnostic, evidence-based ideation engine: independent multi-agent generation, blind→pool brainwriting rounds, embedding-dedup + clustering + split-axis convergence, and an evaluate→regenerate feedback loop — as a zero-dependency injectable function. Bring your own model, embedder, and prompts.",
   "keywords": [
     "ideation",

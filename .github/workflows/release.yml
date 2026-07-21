@@ -42,9 +42,20 @@ jobs:
       - name: Set up Node.js (public npm registry, scoped)
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version: 20
           registry-url: "https://registry.npmjs.org"
           scope: "@kromatic-innovation"
+      # Trusted publishing requires npm >= 11.5.1 — Node 20 ships npm 10.x,
+      # which signs provenance attestations but doesn't perform the
+      # OIDC↔registry token exchange. Pin to the npm 11 line: `npm@latest`
+      # is now npm 12, which dropped Node 20 (requires node >=22) and fails
+      # this step with EBADENGINE. npm 11.x still supports Node 20 and
+      # satisfies the >= 11.5.1 trusted-publishing floor. Mirrors
+      # tickle-stick's release.yml (confirmed working since its v0.4.1).
+      - name: Upgrade npm to support trusted publishing
+        run: |
+          npm install -g npm@11
+          npm --version
       - name: Test
         run: node --test lib/*.test.mjs
       - name: Verify tag matches package.json version
@@ -60,14 +71,7 @@ jobs:
           echo "tag v${TAG} matches package.json ${PKG}"
       - name: Route this publish to public npm (not GitHub Packages)
         run: npm pkg delete publishConfig.registry
-      # OIDC trusted publishing signs provenance correctly but the actual
-      # publish PUT 404s (npm/cli#9088 — same failure tickle-stick hit and
-      # tracked in tickle-stick#38). Falling back to a classic automation
-      # token for the publish step itself; provenance signing is a separate
-      # OIDC code path that already works, so --provenance stays.
       - name: Publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           PROV=""

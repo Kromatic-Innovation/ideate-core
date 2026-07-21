@@ -106,22 +106,19 @@ the human-idea path before wiring a real adapter.
 
 ## How it works (and why)
 
-`ideate-core` is not "ask a model for ideas" — it is a small **evidence-based**
-pipeline drawn from six decades of human-creativity research and the recent
-LLM-ideation literature. It **diverges then converges**: independent multi-agent
-generation (the nominal-group analog), blind→pool build-on rounds (brainwriting),
-then embedding dedup + clustering + split novelty/feasibility selection + human
-rerank, with an optional Delphi-style evaluate→regenerate loop.
+`ideate-core` is a small **evidence-based** pipeline that **diverges then
+converges** — independent multi-agent generation, blind→pool build-on rounds,
+embedding dedup + clustering + split novelty/feasibility selection, and an
+optional Delphi-style evaluate→regenerate loop.
 
-Every design decision — and every default — is justified by a cited finding in
-**[docs/ideation-method.md](docs/ideation-method.md)** (author + year + URL, plus
-a "defaults & their evidence" table). Start there to understand *why* the engine
-is shaped this way.
+The full rationale lives in one place: **[docs/ideation-method.md](docs/ideation-method.md)**
+is the single source of truth for *why* the engine is shaped this way — every
+design decision and default justified by a cited finding (author + year + URL),
+plus a "defaults & their evidence" table. Start there.
 
 **Honesty note:** synthetic ideation is a **drafting aid, not a substitute for
-real customer discovery.** The pipeline widens and sharpens the option space; it
-does not tell you what is true about your market. Treat its shortlist as
-hypotheses to test with people, not answers.
+real customer discovery** — treat its shortlist as hypotheses to test with people,
+not answers.
 
 ## Status
 

@@ -51,6 +51,12 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ### Changed
 
+- **`./feedback` export renamed** (#48) — the worked-example adapter exported as
+  `panelistToFeedback` in `0.1.0` is now `exampleAdapterFromPanelist`, to signal
+  it is an illustrative example rather than a required API. A **deprecated
+  back-compat alias** (`export const panelistToFeedback = exampleAdapterFromPanelist`)
+  is kept for one release so a `0.1.0` consumer's import keeps working; it will
+  be removed in a future minor. Import `exampleAdapterFromPanelist` going forward.
 - **Security docs** (#45, docs only) — `SECURITY.md` now calls out the CLI
   `--adapter` flag as a local code-execution surface (it `import()`s and executes
   the module path you give it), and the README states explicitly that

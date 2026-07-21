@@ -60,7 +60,14 @@ jobs:
           echo "tag v${TAG} matches package.json ${PKG}"
       - name: Route this publish to public npm (not GitHub Packages)
         run: npm pkg delete publishConfig.registry
+      # OIDC trusted publishing signs provenance correctly but the actual
+      # publish PUT 404s (npm/cli#9088 — same failure tickle-stick hit and
+      # tracked in tickle-stick#38). Falling back to a classic automation
+      # token for the publish step itself; provenance signing is a separate
+      # OIDC code path that already works, so --provenance stays.
       - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           PROV=""

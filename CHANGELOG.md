@@ -17,7 +17,13 @@ API surface is the documented `ideateCore` return shape and the `./converge` /
 Each release is cut by tagging `vX.Y.Z` (matching `package.json`), which triggers
 the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
-## [Unreleased]
+## [0.2.0] - Unreleased
+
+> **Next release is a _minor_ bump (0.2.0), not a patch.** Per the versioning
+> convention above, a `0.x.0` minor may carry breaking changes — and this cycle
+> does: #46 removed the `deps.temperatures` back-compat path and its exported
+> constants, which is breaking against the published `0.1.0` artifact. The
+> heading stays `- Unreleased` (undated) until a `v0.2.0` tag is actually cut.
 
 ### Chore
 
@@ -114,6 +120,6 @@ Packaging & release infrastructure (no engine behavior):
 - Routine GitHub Actions dependency bumps via Dependabot (`8e45570`, `5176681`,
   `1ec8072`, `d92fd94`, `fe05196`, `391ae3a`).
 
-[Unreleased]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.1.1...develop
+[0.2.0]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.1.0...develop
 [0.1.1]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Kromatic-Innovation/ideate-core/releases/tag/v0.1.0

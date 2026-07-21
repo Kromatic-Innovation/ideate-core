@@ -21,6 +21,11 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ### Changed
 
+- **Security docs** (#45, docs only) — `SECURITY.md` now calls out the CLI
+  `--adapter` flag as a local code-execution surface (it `import()`s and executes
+  the module path you give it), and the README states explicitly that
+  `input.context` shape-validation is the calling adapter's responsibility, not the
+  engine's.
 - **Docs hygiene** (#44, docs only) — split the `[0.1.0]` changelog so engine
   features (`### Added`) and packaging/CI (`### Infra`/`### Chore`) read
   separately; added a release rollback/yank pointer to

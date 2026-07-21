@@ -47,6 +47,13 @@ client is bundled). Two shapes are contractual, and getting either wrong is
   `{ candidates | posts | ideas: [...] }` wrapper, are all accepted; any object
   without a non-empty string `text` is dropped.
 
+**Input validation is the caller's job.** ideate-core does **not** validate the
+shape of `input.context` — the engine passes it straight through to *your*
+`buildRound1Prompt`/prompt builders, so shape-validating `context` (and any other
+`input` fields your adapter reads) is the calling adapter's responsibility, not the
+engine's. This is intentional: the engine stays domain-agnostic and never throws on
+your input.
+
 ```js
 import { ideateCore } from "ideate-core";
 

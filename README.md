@@ -125,6 +125,12 @@ dependency on any of them, and your own HTTP client is equally first-class.
   any Claude Code user can ideate on their existing session auth. Fails loudly
   (preflight + throwing `complete`) when the CLI is missing/unauthenticated —
   never a silent empty pool.
+- **[subagent-dispatch](integrations/subagent-dispatch/README.md)** (`ideate-core/integrations/subagent-dispatch`)
+  — maps round 1's N independent persona agents onto a host's own subagent /
+  Task-dispatch primitive (one dispatch per persona), a natural fit for agent
+  runtimes like Claude Code's interactive installs. Fails loudly (construction
+  throws + preflight) when no dispatch capability is wired — never a silent empty
+  pool.
 
 Each adapter ships hermetic tests (the subprocess/dispatch primitive is injected,
 so no real CLI, agent runtime, or network is needed to pass CI).

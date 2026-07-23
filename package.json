@@ -22,7 +22,8 @@
     ".": "./lib/ideate-core.mjs",
     "./converge": "./lib/converge.mjs",
     "./feedback": "./lib/feedback.mjs",
-    "./integrations/headless-cli": "./integrations/headless-cli/index.mjs"
+    "./integrations/headless-cli": "./integrations/headless-cli/index.mjs",
+    "./integrations/subagent-dispatch": "./integrations/subagent-dispatch/index.mjs"
   },
   "bin": { "ideate": "bin/ideate.mjs" },
   "files": [

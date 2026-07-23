@@ -111,6 +111,24 @@ Without `--adapter` the CLI runs **fold-only**: it folds `humanIdeas` from stdin
 and prints them, no model client or API key required — useful for sanity-checking
 the human-idea path before wiring a real adapter.
 
+## Integrations (example adapters)
+
+`ideate-core` bundles a small set of **optional, interchangeable example
+adapters** under [`integrations/`](integrations/). Each supplies a `complete(req)
+=> { ok, text }` implementation you can drop into `deps.complete` — they are
+**worked examples, not core dependencies**: the engine has no import-time
+dependency on any of them, and your own HTTP client is equally first-class.
+
+- **[headless-CLI](integrations/headless-cli/README.md)** (`ideate-core/integrations/headless-cli`)
+  — runs `complete()` against a locally-**authenticated** headless Claude Code
+  CLI session (`claude -p --output-format json`) instead of a metered API key, so
+  any Claude Code user can ideate on their existing session auth. Fails loudly
+  (preflight + throwing `complete`) when the CLI is missing/unauthenticated —
+  never a silent empty pool.
+
+Each adapter ships hermetic tests (the subprocess/dispatch primitive is injected,
+so no real CLI, agent runtime, or network is needed to pass CI).
+
 ## How it works (and why)
 
 `ideate-core` is a small **evidence-based** pipeline that **diverges then

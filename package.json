@@ -21,12 +21,22 @@
   "exports": {
     ".": "./lib/ideate-core.mjs",
     "./converge": "./lib/converge.mjs",
-    "./feedback": "./lib/feedback.mjs"
+    "./feedback": "./lib/feedback.mjs",
+    "./integrations/headless-cli": "./integrations/headless-cli/index.mjs"
   },
   "bin": { "ideate": "bin/ideate.mjs" },
-  "files": ["lib", "bin", "docs", "NOTICE", "!lib/*.test.mjs", "!docs/assets/hero.png"],
+  "files": [
+    "lib",
+    "bin",
+    "docs",
+    "integrations",
+    "NOTICE",
+    "!lib/*.test.mjs",
+    "!integrations/**/*.test.mjs",
+    "!docs/assets/hero.png"
+  ],
   "scripts": {
-    "test": "node --test lib/*.test.mjs"
+    "test": "node --test"
   },
   "repository": {
     "type": "git",

@@ -135,6 +135,12 @@ dependency on any of them, and your own HTTP client is equally first-class.
 Each adapter ships hermetic tests (the subprocess/dispatch primitive is injected,
 so no real CLI, agent runtime, or network is needed to pass CI).
 
+**Writing your own adapter?** The package bundles a self-contained, user-invocable
+skill — [`skills/adapter-authoring`](skills/adapter-authoring/SKILL.md) — that
+walks through the `complete()` / candidate `{ok, text}` contract, a minimal
+adapter from scratch, the loud-failure discipline, and both bundled adapters as
+worked examples.
+
 ## How it works (and why)
 
 `ideate-core` is a small **evidence-based** pipeline that **diverges then

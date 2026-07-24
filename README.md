@@ -174,6 +174,6 @@ not answers.
 
 ## Status
 
-Extracted from an internal Kromatic ideation engine, now open source (Apache-2.0) and published to public npm. The configurable multi-agent engine (independent generators + blind→pool build-on rounds, nominal-group / brainwriting style), the divergent→convergent selection half, and the generate→evaluate→regenerate feedback loop are all implemented (feature-complete) — see the method doc above.
+Developed by Kromatic for internal use, then open sourced (Apache-2.0) and published to public npm. The configurable multi-agent engine (independent generators + blind→pool build-on rounds, nominal-group / brainwriting style), the divergent→convergent selection half, and the generate→evaluate→regenerate feedback loop are all implemented (feature-complete) — see the method doc above.
 
 **Stability:** `ideate-core` is **pre-1.0 (0.x)** — feature-complete, but the public API may still change before 1.0 (per the [versioning convention](CHANGELOG.md#versioning-convention): while the major version is `0`, a `0.x.0` minor may carry breaking changes). See [SECURITY.md](SECURITY.md) and [CONTRIBUTING.md](CONTRIBUTING.md); the exact published version is shown by the npm badge above.

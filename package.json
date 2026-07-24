@@ -1,6 +1,6 @@
 {
   "name": "ideate-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A provider-agnostic, evidence-based ideation engine: independent multi-agent generation, blind→pool brainwriting rounds, embedding-dedup + clustering + split-axis convergence, and an evaluate→regenerate feedback loop — as a zero-dependency injectable function. Bring your own model, embedder, and prompts.",
   "keywords": [
     "ideation",
@@ -25,7 +25,9 @@
     "./integrations/headless-cli": "./integrations/headless-cli/index.mjs",
     "./integrations/subagent-dispatch": "./integrations/subagent-dispatch/index.mjs"
   },
-  "bin": { "ideate": "bin/ideate.mjs" },
+  "bin": {
+    "ideate": "bin/ideate.mjs"
+  },
   "files": [
     "lib",
     "bin",
@@ -49,5 +51,7 @@
     "url": "https://github.com/Kromatic-Innovation/ideate-core/issues"
   },
   "author": "Kromatic Innovation (https://www.kromatic.com/)",
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }

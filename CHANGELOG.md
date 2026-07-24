@@ -17,13 +17,80 @@ API surface is the documented `ideateCore` return shape and the `./converge` /
 Each release is cut by tagging `vX.Y.Z` (matching `package.json`), which triggers
 the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
-## [0.2.0] - Unreleased
+## [0.3.1] - 2026-07-24
 
-> **Next release is a _minor_ bump (0.2.0), not a patch.** Per the versioning
+Release-pipeline verification patch. **No source, API, or behavioural changes** —
+the published tarball is byte-identical to `0.3.0`. The only commit since that
+tag touches `.github/workflows/scorecard.yml`, which does not ship.
+
+This release exists to prove the automated npm **trusted-publishing** path
+works, which it never has. This package's npm Trusted Publisher declared an
+`Environment name` of `main` while `release.yml` declares no `environment:`, so
+the OIDC token carried no environment claim; the mismatch made npm reject the
+publish and surfaced as an opaque `404 PUT` rather than an auth error. `0.3.0`
+was published manually as a result. With the Trusted Publisher corrected to a
+blank environment, a version bump is the only way to verify — npm refuses to
+re-publish an existing version.
+
+### Fixed
+
+- **Changelog accuracy.** Two defects corrected in this release:
+  - `0.2.0` was headed `- Unreleased` despite having been tagged `v0.2.0` and
+    published to npm on 2026-07-21. Now dated.
+  - **`0.3.0` had no entry at all** — it was tagged and published on 2026-07-23
+    with its public API additions undocumented here. Reconstructed below from
+    the commit range `v0.2.0..v0.3.0`.
+
+### Chore
+
+- CI only, nothing shipped: trigger Scorecard on `develop` (the default branch)
+  rather than `main`.
+
+### Note
+
+The proposal to replace this repo's inline `release.yml` with a shared
+cross-repo reusable workflow was **withdrawn** (#66): a public repo cannot call
+a reusable workflow hosted in a private one, so it could never execute. The
+shared-template goal moves to a sync-and-drift-check model
+(code-workspace-config#1559), leaving this repo's working inline workflow in
+place.
+
+## [0.3.0] - 2026-07-23
+
+> **Reconstructed retroactively in `0.3.1`.** This release was tagged and
+> published to npm without a changelog entry; the content below is derived from
+> the `v0.2.0..v0.3.0` commit range.
+
+Minor bump: adds two new public `integrations/*` subpath exports and ships an
+adapter-authoring skill inside the package.
+
+### Added
+
+- **`./integrations/headless-cli`** — headless-CLI invoker adapter, using
+  session auth rather than a metered API key.
+- **`./integrations/subagent-dispatch`** — subagent-dispatch invoker adapter
+  (per-persona round-1 generation).
+- **Adapter-authoring skill** bundled in `skills/`, shipped with the package, so
+  consumers can write their own invoker adapters.
+
+### Chore
+
+- Adopted the canonical Internal Platform `promote-main.yml`.
+- Committed `package-lock.json` for reproducible `npm ci` in CI.
+- Gitignored the generated `.agents/`, `.codex/`, and `.zenodotus/` directories
+  (cwc#369, #65).
+- Pinned the release workflow to the `npm@11` line for OIDC trusted publishing,
+  mirroring tickle-stick (#64). Supersedes two earlier incorrect attempts: an
+  `NPM_TOKEN` fallback (#63) and a Node 24 bump (#62), both aimed at the same
+  `404` that was in fact the Trusted Publisher environment mismatch described
+  under `0.3.1`.
+
+## [0.2.0] - 2026-07-21
+
+> **This was a _minor_ bump (0.2.0), not a patch.** Per the versioning
 > convention above, a `0.x.0` minor may carry breaking changes — and this cycle
-> does: #46 removed the `deps.temperatures` back-compat path and its exported
-> constants, which is breaking against the published `0.1.0` artifact. The
-> heading stays `- Unreleased` (undated) until a `v0.2.0` tag is actually cut.
+> did: #46 removed the `deps.temperatures` back-compat path and its exported
+> constants, which is breaking against the published `0.1.0` artifact.
 >
 > The docs-only changes previously staged under a dated `[0.1.1] - 2026-07-20`
 > heading are folded in below: **no `v0.1.1` tag was ever cut and only `0.1.0`

@@ -6,6 +6,21 @@
 
 ![ideate-core: three people building ideas together at a whiteboard covered in post-its](docs/assets/hero.png)
 
+## Quick start
+
+```bash
+npm i ideate-core
+
+# Zero-setup smoke test — folds human ideas with no model client or API key:
+echo '{"context":{"slug":"demo"},"humanIdeas":["a seed idea","another"]}' | npx ideate
+```
+
+Then wire your own model client to generate ideas — the minimal `ideateCore` call
+is a few lines ([full example below](#install)). The rest of this README explains
+what the engine does and why; jump straight to [Install](#install) for the API.
+
+---
+
 **Use case:** you need a pool of genuinely different ideas from an LLM — for a campaign brief, a product-naming pass, a strategy option set — not five rephrasings of the same idea with the temperature turned up.
 
 **Differentiator:** most "ideation" wrappers are one model call with a "be creative" system prompt. "Ask the model for 5 ideas" reliably produces 5 idea *phrasings*. ideate-core instead engineers the diversity the way human brainwriting does: independent, blind generator agents (persona is the lever, not temperature — the research backs this), pooled through real build-on rounds, then optionally converged with embedding-dedup + split-axis scoring instead of one LLM-judge "best idea." It's a zero-dependency injectable function, not a framework — bring your own model client.

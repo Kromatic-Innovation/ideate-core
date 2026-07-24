@@ -9,7 +9,7 @@ on:
   schedule:
     - cron: "41 6 * * 1"
   push:
-    branches: [main]
+    branches: [develop]
   workflow_dispatch: {}
 
 permissions: read-all

@@ -30,6 +30,12 @@ Requires Node.js >= 20.
 
 ## Pull requests
 
+**Branch model:** `develop` is the default branch and the integration target for
+all contributions; `main` is the release/deploy ref that `develop` is promoted to
+(see [`promote-main.yml`](.github/workflows/promote-main.yml)). The CI and npm
+badges point at `main` because that is what ships — but you branch from and open
+PRs against `develop`.
+
 1. Branch from `develop`.
 2. Add or update offline tests for any behavior change.
 3. Keep the public API and the documented candidate shape stable (this is a

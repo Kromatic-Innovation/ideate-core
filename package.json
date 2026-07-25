@@ -40,6 +40,7 @@
     "!docs/assets/hero.png"
   ],
   "scripts": {
+    "build": "node -e \"process.stdout.write('ideate-core ships .mjs source directly; no build step (zero-dependency ESM, exports resolve to committed lib/*.mjs)\\n')\"",
     "test": "node --test"
   },
   "repository": {

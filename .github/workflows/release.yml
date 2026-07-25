@@ -1,86 +1,107 @@
 name: Release
 
-# Publish ideate-core to the PUBLIC npm registry (Apache-2.0)
-# on a v* tag. This is DISTINCT from the internal GitHub Packages publish
-# (package.json `publishConfig.registry`): this job deletes that publishConfig
-# entry in-CI so the release targets npmjs.org, and publishes with
-# `--access public`. npm provenance is enabled when the repo is public
-# (provenance requires a public repo); while private it is skipped.
+# ⚠️  CANONICAL TEMPLATE — DO NOT HAND-EDIT PER REPO.
 #
-# Auth is npm Trusted Publishing (OIDC) — no NPM_TOKEN secret, no long-lived
-# credential anywhere. `id-token: write` below lets npm CLI >=11.5.1 mint a
-# short-lived OIDC token and exchange it with the registry at publish time.
-# This requires a one-time bootstrap: npm's Trusted Publisher can only be
-# attached to a package that already exists, so the FIRST publish for a new
-# package must be a manual `npm publish` from a maintainer's logged-in
-# machine; every release after that runs through this workflow with zero
-# stored secrets. See tickle-stick's release.yml for the working reference
-# (confirmed via its CI logs: "Signed provenance statement ... from GitHub
-# Actions", no NPM_TOKEN present anywhere).
+# This is the single source of truth for `release.yml` (npm publish) across
+# every Internal Platform repo that publishes to npm (registry
+# `publishingScheme: npm` — currently ideate-core / panelist / tickle-stick).
+# It is versioned in code-workspace-config at `templates/release-npm.yml` and
+# synced into each npm repo by `scripts/sync_promote_workflows.py` (mirror of
+# `derive_repo_configs.py` / the `promote-main.yml` sync). A CI drift-check
+# (`.github/workflows/promote-workflow-drift.yml`) reports divergence between a
+# repo's committed copy and this canonical content.
+#
+# To change the npm publish flow, edit THIS template and re-run the sync
+# script — never hand-edit a repo's `.github/workflows/release.yml`.
+# cwc#1559 / cwc#1439. End home: cron-fleet (rides cwc#1107).
+#
+# ─── Why template-and-sync, not a cross-repo reusable workflow ───────────────
+#
+# The earlier design (cwc#1439) centralised these steps into a reusable
+# `workflow_call` in cwc referenced at runtime as
+# `Kromatic-Innovation/code-workspace-config/.github/workflows/npm-oidc-publish.yml@main`.
+# That CANNOT work: cwc is a PRIVATE repo with `actions/permissions/access`
+# = `none`, while every consumer (ideate-core / panelist / tickle-stick) is
+# PUBLIC. tickle-stick#111 proved it — the migration merged, passed PR CI, and
+# then failed at dispatch with `workflow was not found` (an access failure, not
+# a missing file). Granting four public repos runtime access into the private
+# governance repo is a security-posture change, not a config tweak. So instead
+# we template-and-sync, exactly like `promote-main.yml` (cwc#1468):
+#
+#   - No cross-repo runtime access → public/private visibility is irrelevant.
+#   - No new private-repo exposure.
+#   - No OIDC caller ambiguity. npm Trusted Publishing validates the CALLING
+#     workflow's filename, so keeping the publish inline in each repo's own
+#     `release.yml` keeps the existing Trusted Publisher configuration valid.
+#
+# The trade-off (each repo carries a copy) is made safe by the drift-check —
+# the same trade the fleet already accepted for `promote-main.yml`.
+#
+# This template is repo-agnostic: `npm publish` reads the package name from the
+# repo's own `package.json`, and Trusted Publishing keys on the `release.yml`
+# filename (identical across every repo), so the same bytes publish the correct
+# package in whichever repo they land in. Authored from tickle-stick's
+# known-good inline `release.yml` (the v0.6.x publisher).
+#
+# Actions pinned to full commit SHAs (not mutable tags). A compromised
+# maintainer of any upstream action can retag `v6`/`release/v1`/etc. and
+# push malicious code into our next release, which our trusted-publishing
+# identity would then happily sign. SHA pins make action content
+# immutable — upgrades are explicit PRs, not silent.
+# Comment after each pin records the semver tag the SHA corresponded to
+# at pin time, for human-readable version tracking.
 
 on:
   push:
-    tags: ["v*"]
-  workflow_dispatch:
-    inputs:
-      dry_run:
-        description: "Validate with npm publish --dry-run (no real publish)"
-        type: boolean
-        default: true
+    tags:
+      - "v*"
 
 permissions:
   contents: read
-  id-token: write # npm provenance
 
 jobs:
-  release:
-    name: Publish to public npm
+  build-and-publish:
+    name: Build + publish to npm
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write         # npm provenance attestations via OIDC
     steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Set up Node.js (public npm registry, scoped)
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
           node-version: 20
-          registry-url: "https://registry.npmjs.org"
-          scope: "@kromatic-innovation"
+          registry-url: https://registry.npmjs.org
+
       # Trusted publishing requires npm >= 11.5.1 — Node 20 ships npm 10.x,
       # which signs provenance attestations but doesn't perform the
       # OIDC↔registry token exchange. Pin to the npm 11 line: `npm@latest`
       # is now npm 12, which dropped Node 20 (requires node >=22) and fails
-      # this step with EBADENGINE. npm 11.x still supports Node 20 and
-      # satisfies the >= 11.5.1 trusted-publishing floor. Mirrors
-      # tickle-stick's release.yml (confirmed working since its v0.4.1).
+      # this step with EBADENGINE. npm 11.x still supports Node 20
+      # (^20.17.0) and satisfies the >= 11.5.1 trusted-publishing floor.
       - name: Upgrade npm to support trusted publishing
         run: |
           npm install -g npm@11
           npm --version
-      - name: Test
-        run: node --test lib/*.test.mjs
-      - name: Verify tag matches package.json version
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          set -euo pipefail
-          TAG="${GITHUB_REF_NAME#v}"
-          PKG="$(node -p "require('./package.json').version")"
-          if [ "$TAG" != "$PKG" ]; then
-            echo "::error::tag v${TAG} does not match package.json version ${PKG}"
-            exit 1
-          fi
-          echo "tag v${TAG} matches package.json ${PKG}"
-      - name: Route this publish to public npm (not GitHub Packages)
-        run: npm pkg delete publishConfig.registry
-      - name: Publish
-        run: |
-          set -euo pipefail
-          PROV=""
-          if [ "${{ github.event.repository.visibility }}" = "public" ]; then
-            PROV="--provenance"
-          fi
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "Dry run — no publish."
-            npm publish --access public --dry-run
-          else
-            npm publish --access public $PROV
-          fi
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify package contents
+        run: npm pack --dry-run
+
+      # npm Trusted Publishing (OIDC) via the publisher configured on
+      # npmjs.com for each package (owner Kromatic-Innovation, the package's
+      # own repo, workflow release.yml). No NPM_TOKEN secret is present
+      # anywhere — org or repo. CI logs show "Signed provenance statement
+      # ... from GitHub Actions" with no stored credential of any kind.
+      # OIDC detection needs npm >= 11.5.1 (see the upgrade step above); a
+      # 404/ENEEDAUTH here is that floor not being met, not a broken
+      # publisher. Confirmed working on tickle-stick since v0.4.1.
+      - name: Publish to npm
+        run: npm publish --provenance --access public

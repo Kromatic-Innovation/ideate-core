@@ -41,6 +41,13 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ### Added
 
+- **Formatter check in CI (#97).** Per the maintainer decision, added a
+  format-check-only step (Prettier, default rules + `printWidth: 100` to match the
+  existing style — no opinionated lint rules). `npm run format` / `npm run
+  format:check` scripts, a `prettier` **dev**-dependency (the library still ships
+  zero runtime deps), and CI runs `format:check` alongside `node --test`. This
+  commit establishes the formatting baseline (formatting-only, no behavioural
+  change) so an outside contributor has a mechanical style target.
 - **Agent failure counters — the silent-empty-pool is now observable (#90).**
   Every per-agent client failure (network, auth, rate limit, malformed reply,
   missing binary) becomes `null` then zero candidates for that agent, and an

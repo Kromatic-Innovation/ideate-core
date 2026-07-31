@@ -24,10 +24,7 @@
 import { pathToFileURL } from "node:url";
 import { isAbsolute, resolve } from "node:path";
 
-import {
-  createSubagentDispatchComplete,
-  assertSubagentDispatchAvailable,
-} from "./index.mjs";
+import { createSubagentDispatchComplete, assertSubagentDispatchAvailable } from "./index.mjs";
 import { withSamplingParamStrip } from "../sampling-params.mjs";
 
 // A generic, PERSONA-AWARE round-1 prompt builder. Round 1 differentiates agents

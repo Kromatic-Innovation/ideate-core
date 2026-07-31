@@ -64,10 +64,7 @@ const enoent = () => Object.assign(new Error("spawn claude ENOENT"), { code: "EN
 
 // ── defaultExtractText ───────────────────────────────────────────────────────
 test("defaultExtractText pulls `result` from the claude JSON envelope", () => {
-  assert.equal(
-    defaultExtractText('{"type":"result","is_error":false,"result":"hello"}'),
-    "hello",
-  );
+  assert.equal(defaultExtractText('{"type":"result","is_error":false,"result":"hello"}'), "hello");
 });
 
 test("defaultExtractText falls back to `text`, then raw non-JSON body", () => {
@@ -79,7 +76,10 @@ test("defaultExtractText falls back to `text`, then raw non-JSON body", () => {
 test("defaultExtractText throws loudly on is_error=true", () => {
   assert.throws(
     () => defaultExtractText('{"is_error":true,"result":"auth failed"}'),
-    (e) => e instanceof HeadlessCliError && /is_error=true/.test(e.message) && /auth failed/.test(e.message),
+    (e) =>
+      e instanceof HeadlessCliError &&
+      /is_error=true/.test(e.message) &&
+      /auth failed/.test(e.message),
   );
 });
 
@@ -102,25 +102,36 @@ test("complete() returns { ok, text } and feeds the prompt on stdin", async () =
 test("complete() throws (not returns null) when the CLI is missing (ENOENT)", async () => {
   const spawn = makeFakeSpawn({ errorEvent: enoent() });
   const complete = createHeadlessCliComplete({ spawn });
-  await assert.rejects(complete({ prompt: "x" }), (e) => e instanceof HeadlessCliError && /not found on PATH/.test(e.message));
+  await assert.rejects(
+    complete({ prompt: "x" }),
+    (e) => e instanceof HeadlessCliError && /not found on PATH/.test(e.message),
+  );
 });
 
 test("complete() throws on non-zero exit and surfaces stderr", async () => {
   const spawn = makeFakeSpawn({ stderr: "not authenticated", code: 1 });
   const complete = createHeadlessCliComplete({ spawn });
-  await assert.rejects(complete({ prompt: "x" }), (e) => /exited with code 1/.test(e.message) && /not authenticated/.test(e.message));
+  await assert.rejects(
+    complete({ prompt: "x" }),
+    (e) => /exited with code 1/.test(e.message) && /not authenticated/.test(e.message),
+  );
 });
 
 test("complete() throws when output has no extractable text", async () => {
   const spawn = makeFakeSpawn({ stdout: '{"is_error":false}', code: 0 });
   const complete = createHeadlessCliComplete({ spawn });
-  await assert.rejects(complete({ prompt: "x" }), (e) => /could not extract non-empty text/.test(e.message));
+  await assert.rejects(complete({ prompt: "x" }), (e) =>
+    /could not extract non-empty text/.test(e.message),
+  );
 });
 
 test("complete() requires a non-empty prompt", async () => {
   const spawn = makeFakeSpawn({ stdout: "x", code: 0 });
   const complete = createHeadlessCliComplete({ spawn });
-  await assert.rejects(complete({}), (e) => e instanceof HeadlessCliError && /req\.prompt/.test(e.message));
+  await assert.rejects(
+    complete({}),
+    (e) => e instanceof HeadlessCliError && /req\.prompt/.test(e.message),
+  );
 });
 
 test("complete() times out and kills a hung CLI", async () => {
@@ -139,12 +150,16 @@ test("assertHeadlessCliAvailable returns the version on success", async () => {
 
 test("assertHeadlessCliAvailable throws loudly when the CLI is absent", async () => {
   const spawn = makeFakeSpawn({ errorEvent: enoent() });
-  await assert.rejects(assertHeadlessCliAvailable({ spawn }), (e) => /not found on PATH/.test(e.message));
+  await assert.rejects(assertHeadlessCliAvailable({ spawn }), (e) =>
+    /not found on PATH/.test(e.message),
+  );
 });
 
 test("assertHeadlessCliAvailable throws when the probe exits non-zero (unauthenticated)", async () => {
   const spawn = makeFakeSpawn({ stderr: "please run `claude` to log in", code: 1 });
-  await assert.rejects(assertHeadlessCliAvailable({ spawn }), (e) => /may be installed but not authenticated/.test(e.message));
+  await assert.rejects(assertHeadlessCliAvailable({ spawn }), (e) =>
+    /may be installed but not authenticated/.test(e.message),
+  );
 });
 
 // ── runProcess resolves rather than rejects ──────────────────────────────────

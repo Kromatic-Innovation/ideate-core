@@ -102,7 +102,11 @@ test("a default-panel run against a rejecting model completes (no silent empty p
   const bare = strictModelComplete();
   const { candidates: none } = await ideateCore(
     { context: { slug: "demo" } },
-    { buildRound1Prompt: ({ persona }) => `R1 ${persona}`, complete: bare, models: { round1: "claude-opus-4-8" } },
+    {
+      buildRound1Prompt: ({ persona }) => `R1 ${persona}`,
+      complete: bare,
+      models: { round1: "claude-opus-4-8" },
+    },
   );
   assert.equal(none.length, 0, "without the strip, the rejecting model yields an empty pool");
 });

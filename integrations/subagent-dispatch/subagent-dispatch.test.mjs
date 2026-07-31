@@ -83,7 +83,10 @@ test("complete accepts string, {text}, {result}, {output} dispatch shapes", asyn
 
 test("complete requires a non-empty prompt", async () => {
   const complete = createSubagentDispatchComplete({ dispatch: makeFakeDispatch(ideasReply) });
-  await assert.rejects(() => complete({ persona: "x" }), /req\.prompt \(non-empty string\) is required/);
+  await assert.rejects(
+    () => complete({ persona: "x" }),
+    /req\.prompt \(non-empty string\) is required/,
+  );
 });
 
 test("complete supports a custom mapRequest", async () => {
@@ -103,12 +106,15 @@ test("complete throws when dispatch throws", async () => {
     throw new Error("runtime exploded");
   };
   const complete = createSubagentDispatchComplete({ dispatch });
-  await assert.rejects(() => complete({ prompt: "p", persona: "Ada" }), (err) => {
-    assert.ok(err instanceof SubagentDispatchError);
-    assert.match(err.message, /persona 'Ada' failed/);
-    assert.match(err.message, /runtime exploded/);
-    return true;
-  });
+  await assert.rejects(
+    () => complete({ prompt: "p", persona: "Ada" }),
+    (err) => {
+      assert.ok(err instanceof SubagentDispatchError);
+      assert.match(err.message, /persona 'Ada' failed/);
+      assert.match(err.message, /runtime exploded/);
+      return true;
+    },
+  );
 });
 
 test("complete throws when dispatch returns ok:false", async () => {
@@ -122,7 +128,10 @@ test("complete throws when dispatch returns an unextractable shape", async () =>
   const complete = createSubagentDispatchComplete({
     dispatch: makeFakeDispatch(() => ({ nope: 1 })),
   });
-  await assert.rejects(() => complete({ prompt: "p", persona: "x" }), /could not extract reply text/);
+  await assert.rejects(
+    () => complete({ prompt: "p", persona: "x" }),
+    /could not extract reply text/,
+  );
 });
 
 test("complete throws when dispatch returns empty text", async () => {

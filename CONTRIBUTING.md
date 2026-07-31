@@ -17,13 +17,19 @@ the method — the design is evidence-based and each default is cited.
   output; it drops malformed candidates instead.
 - **Keep scope tight.** Domain-specific prompt copy and fields belong in the
   caller's adapter, not in the core.
+- **Formatting is enforced.** Run `npm run format` before pushing; CI runs
+  `npm run format:check` (Prettier, default rules + `printWidth: 100`). This is a
+  formatter only — no opinionated lint rules — so it just gives contributors a
+  mechanical style target.
 
 ## Development
 
 ```bash
 git clone https://github.com/Kromatic-Innovation/ideate-core.git
 cd ideate-core
+npm install         # dev-only: prettier (the library ships zero runtime deps)
 npm test            # node --test lib/*.test.mjs
+npm run format      # prettier --write "**/*.mjs" (run before pushing)
 ```
 
 Requires Node.js >= 20.
@@ -40,7 +46,7 @@ PRs against `develop`.
 2. Add or update offline tests for any behavior change.
 3. Keep the public API and the documented candidate shape stable (this is a
    pre-1.0 library; breaking changes need a clear rationale and a semver bump).
-4. Ensure `npm test` is green and `npm pack --dry-run` is clean.
+4. Ensure `npm test` is green, `npm run format:check` passes, and `npm pack --dry-run` is clean.
 5. Open the PR against `develop`; describe the change and link any issue.
 
 ## Releasing (maintainers)

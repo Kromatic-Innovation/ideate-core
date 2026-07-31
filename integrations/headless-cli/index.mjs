@@ -75,7 +75,14 @@ export function runProcess({
     try {
       child = spawn(command, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
     } catch (err) {
-      resolve({ stdout: "", stderr: "", code: null, signal: null, spawnError: err, timedOut: false });
+      resolve({
+        stdout: "",
+        stderr: "",
+        code: null,
+        signal: null,
+        spawnError: err,
+        timedOut: false,
+      });
       return;
     }
 

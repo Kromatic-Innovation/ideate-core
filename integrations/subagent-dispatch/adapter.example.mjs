@@ -26,12 +26,19 @@ import { isAbsolute, resolve } from "node:path";
 
 import { createSubagentDispatchComplete, assertSubagentDispatchAvailable } from "./index.mjs";
 import { withSamplingParamStrip } from "../sampling-params.mjs";
+import { DEFAULT_IDEAS_PER_AGENT } from "../../lib/ideate-core.mjs";
 
 // A generic, PERSONA-AWARE round-1 prompt builder. Round 1 differentiates agents
 // by persona (persona beats temperature), so the persona/stance is woven into
 // the prompt. `context` may be a string or an object with a `brief`. Replace
-// this with a domain-specific builder for real use.
-export function buildRound1Prompt({ context, persona, stance, ideasPerAgent = 6 } = {}) {
+// this with a domain-specific builder for real use. Defaults ideasPerAgent to
+// the core's DEFAULT_IDEAS_PER_AGENT rather than a hardcoded literal.
+export function buildRound1Prompt({
+  context,
+  persona,
+  stance,
+  ideasPerAgent = DEFAULT_IDEAS_PER_AGENT,
+} = {}) {
   const brief =
     typeof context === "string"
       ? context

@@ -19,6 +19,16 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ## [Unreleased]
 
+### Chore
+
+- **Synced `package-lock.json` to `0.3.1` and added a CI version-match assertion (#93).**
+  The lockfile was left at `0.3.0` when `0.3.1` bumped `package.json`. `npm ci`
+  tolerates a root-version mismatch so the release path was not blocked, but the
+  lockfile is a provenance artifact and a stale one hides any future desync. CI
+  now fails if `package.json` and `package-lock.json` versions diverge, and the
+  `CONTRIBUTING.md` release procedure gains the `npm install --package-lock-only`
+  step.
+
 ### Added
 
 - **Agent failure counters — the silent-empty-pool is now observable (#90).**

@@ -57,6 +57,13 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ### Fixed
 
+- **Agent id de-collision could still collide with an explicit name (#95).**
+  The de-collision loop registered only the **base** id in `seen`, so a panel
+  like `[{persona:"a"},{persona:"a"},{id:"a-2"}]` generated `a-2` for the second
+  agent AND accepted an explicitly-named `a-2` for the third — reproduced as
+  `["a","a-2","a-2"]`, the same silent-candidate-loss consequence as the primary
+  ID bug (#87). Every assigned id is now registered and the suffix loop increments
+  until it finds a genuinely free id, yielding `["a","a-2","a-2-2"]`.
 - **Regeneration bypassed `deps.maxTokens` and the agent's temperature (#92).**
   `regenerateOne` hardcoded `temperature: 0.7` / `maxTokens: 2048`, ignoring the
   `deps.maxTokens` honored on every other model path and flattening every

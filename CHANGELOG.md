@@ -21,6 +21,17 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ### Added
 
+- **Agent failure counters — the silent-empty-pool is now observable (#90).**
+  Every per-agent client failure (network, auth, rate limit, malformed reply,
+  missing binary) becomes `null` then zero candidates for that agent, and an
+  all-failed run resolved successfully with `candidates: []` — no error, no
+  counter. `meta` now reports `agentsAttempted` and `agentsFailed` (round-1
+  panel), and `ideateCore` accepts an optional `deps.onAgentError(err, {agentId,
+  round})` callback. `runFeedbackLoop` gains `feedback.evaluatorFailures` and a
+  `deps.onEvaluatorError` callback so a **thrown** evaluator is distinguishable
+  from a satisfied one (the `safeEvaluate` gap). The per-agent no-throw
+  robustness contract is unchanged — these only surface what was already being
+  swallowed.
 - **Adapter-side strip-and-warn for rejected sampling params (#89).** Current
   Anthropic frontier models (Opus 5, Sonnet 5, Opus 4.8/4.7, Fable 5) reject
   `temperature` / `top_p` / `top_k` with HTTP 400; Haiku 4.5 still accepts them.

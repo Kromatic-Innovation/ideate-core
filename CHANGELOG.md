@@ -19,6 +19,16 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ## [Unreleased]
 
+### Deprecated
+
+- **`panelistToFeedback` will be removed in `0.4.0` (#96).** The alias (deprecated
+  since `0.2.0`, preserving the `0.1.0` export name for
+  `import { panelistToFeedback } from "ideate-core/feedback"`) now has a named
+  removal version instead of an open-ended "future minor". Migrate to
+  `exampleAdapterFromPanelist` — the two are identical. `0.4.0` is the next minor,
+  and pre-1.0 minors may drop a deprecated export (see the versioning convention
+  above). The alias remains fully functional and tested until then.
+
 ### Chore
 
 - **Synced `package-lock.json` to `0.3.1` and added a CI version-match assertion (#93).**

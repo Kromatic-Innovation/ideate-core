@@ -67,13 +67,50 @@ jobs:
       contents: read
       id-token: write         # npm provenance attestations via OIDC
     steps:
+      # fetch-depth: 0 — the "tag is on merged code" assertion below needs the
+      # full history to test ancestry of the tagged SHA against origin/main.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
+
+      # Gap 2 (cwc#1821): the tag was never checked against package.json, so
+      # tagging `v9.9.9` on a tree whose manifest says `0.3.1` published `0.3.1`
+      # under a `v9.9.9` tag. Fail the release when the tag name (minus its
+      # leading `v`) disagrees with the manifest version. Repo-agnostic — reads
+      # the version from whichever package.json is checked out.
+      - name: Verify tag matches package.json version
+        run: |
+          set -euo pipefail
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Release tag '${GITHUB_REF_NAME}' disagrees with package.json version '${PKG_VERSION}'. Tag the commit whose manifest matches, or bump package.json before tagging."
+            exit 1
+          fi
+          echo "OK: tag '${GITHUB_REF_NAME}' matches package.json version '${PKG_VERSION}'."
+
+      # Gap 3 (cwc#1821): `on: push: tags: "v*"` fires from ANY ref, so a tag on
+      # an unmerged feature branch would publish to public npm without the code
+      # ever reaching develop or CI. Constraining the trigger to a branch is not
+      # possible for tag pushes, so we assert the stronger property directly: the
+      # tagged commit must be reachable from origin/main (i.e. it has been merged
+      # and promoted). develop-main repos release from main, so this holds for a
+      # legitimate release and rejects a tag on unmerged code.
+      - name: Assert tagged commit is merged (ancestor of origin/main)
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Tagged commit ${GITHUB_SHA} is not an ancestor of origin/main. Publish only from tags on merged, promoted code."
+            exit 1
+          fi
+          echo "OK: tagged commit ${GITHUB_SHA} is reachable from origin/main."
 
       # Trusted publishing requires npm >= 11.5.1 — Node 20 ships npm 10.x,
       # which signs provenance attestations but doesn't perform the
@@ -89,8 +126,26 @@ jobs:
       - name: Install
         run: npm ci
 
+      # `--if-present` so the SAME bytes work for a `tsc` package (runs the
+      # build) and a build-less pure-ESM package (a no-op, exit 0) alike.
+      # ideate-core and panelist declare no `build` script — an unconditional
+      # `npm run build` fails them with `Missing script: "build"`. Byte-match
+      # is what the drift-check asserts, so the conditional lives in the
+      # canonical template, never as a per-repo stub build script. cwc#1590.
       - name: Build
-        run: npm run build
+        run: npm run build --if-present
+
+      # Gap 1 (cwc#1821): the release published with NO test step, so provenance
+      # signed a broken-but-untested artifact with a trusted identity — and npm
+      # forbids re-publishing an unpublished version (unpublish only within 72h).
+      # `--if-present` mirrors the Build step above: a repo WITH a test script
+      # (the real concern — a tested package whose tests regressed) runs and
+      # gates on it, while a build-less/test-less package stays a no-op exit 0,
+      # so the same bytes are correct across every npm repo. Byte-match is what
+      # the drift-check asserts, so the conditional lives in the canonical
+      # template, never as a per-repo stub.
+      - name: Test
+        run: npm run test --if-present
 
       - name: Verify package contents
         run: npm pack --dry-run
@@ -103,5 +158,19 @@ jobs:
       # OIDC detection needs npm >= 11.5.1 (see the upgrade step above); a
       # 404/ENEEDAUTH here is that floor not being met, not a broken
       # publisher. Confirmed working on tickle-stick since v0.4.1.
+      #
+      # Strip `publishConfig.registry` before publishing (cwc#1590; load-bearing,
+      # named by cwc#1559's own scope and then dropped). A repo may set
+      # `publishConfig.registry` (e.g. panelist pins its org-scoped GitHub
+      # Packages copy for a separate `publish.yml`), and that field takes
+      # precedence over setup-node's `registry-url` — so verbatim the template
+      # would try to publish the PUBLIC unscoped package to the scoped registry
+      # and fail. Deleting the key routes the trusted-publishing publish to
+      # `registry.npmjs.org`. `npm pkg delete` on an absent key is a no-op, so
+      # the same bytes are correct for repos with `publishConfig: null`
+      # (ideate-core / tickle-stick) too.
+      - name: Strip publishConfig.registry (publish to npmjs, not a scoped registry)
+        run: npm pkg delete publishConfig.registry
+
       - name: Publish to npm
         run: npm publish --provenance --access public

@@ -26,4 +26,9 @@ jobs:
             }
             console.log(`version match: ${pkg}`);
           '
+      # Install devDependencies (prettier only) so the format check can run. The
+      # package ships ZERO runtime dependencies; prettier is dev-only.
+      - run: npm ci
+      - name: Check formatting (prettier --check)
+        run: npm run format:check
       - run: node --test

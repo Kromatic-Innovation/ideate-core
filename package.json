@@ -41,7 +41,9 @@
   ],
   "scripts": {
     "build": "node -e \"process.stdout.write('ideate-core ships .mjs source directly; no build step (zero-dependency ESM, exports resolve to committed lib/*.mjs)\\n')\"",
-    "test": "node --test"
+    "test": "node --test",
+    "format": "prettier --write \"**/*.mjs\"",
+    "format:check": "prettier --check \"**/*.mjs\""
   },
   "repository": {
     "type": "git",
@@ -54,5 +56,8 @@
   "author": "Kromatic Innovation (https://www.kromatic.com/)",
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6"
   }
 }

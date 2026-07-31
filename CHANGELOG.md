@@ -41,6 +41,17 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ### Added
 
+- **Regeneration runs concurrently; convergence complexity documented (#98).**
+  `regenerateOne`'s caller awaited one model call per flagged idea (sequential),
+  while every other multi-call path is concurrent — a 15-flagged-idea round was
+  ~15 serial round-trips per feedback round. It now mirrors round 1's `Promise.all`
+  with stable output ordering and the same never-lose-a-flagged-idea semantics;
+  concurrency is unbounded by default (like round 1), with an optional
+  `deps.regenConcurrency` cap for rate-limited providers (no default cap — that
+  would be an unmeasured guess). Separately, `convergePool`'s JSDoc now documents
+  each path's complexity (`semanticDedupe`/`scoreAxes`/`poolDiversity` O(n²);
+  `clusterByEmbedding` O(n·k) for `k:"auto"` vs O(n³) for a fixed numeric `k`) so
+  callers can choose `k:"auto"` for large pools.
 - **Formatter check in CI (#97).** Per the maintainer decision, added a
   format-check-only step (Prettier, default rules + `printWidth: 100` to match the
   existing style — no opinionated lint rules). `npm run format` / `npm run

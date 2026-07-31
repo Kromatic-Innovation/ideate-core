@@ -47,6 +47,16 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ### Fixed
 
+- **`meta` reported configured rounds and a misleading `ideasPerAgent` scalar (#91).**
+  `meta.maxRounds` / `meta.sharing` reflected the *configured* round count, so a
+  run with no `buildRound2Prompt` (only round 1 executes) still reported
+  `sharing: ["blind","pool"]` — recording a brainwriting round that never ran, in
+  the very field that asserts real brainwriting occurred. `meta` now adds
+  `roundsRun` (executed) and `sharing` reflects it (`["blind"]` for a one-round
+  run); `maxRounds` still reports the configured value. Separately,
+  `meta.ideasPerAgent` reported only `agents[0]`'s value as though it were the
+  panel's; it is now the scalar only when uniform (else `null`), with the true
+  per-agent distribution in `meta.ideasPerAgentByAgent`.
 - **CLI crashed at module load on any path containing a space (#88).**
   `bin/ideate.mjs` derived the package.json path from `new URL(import.meta.url).pathname`,
   which is percent-encoded — a space became `%20`, which `readFileSync` cannot

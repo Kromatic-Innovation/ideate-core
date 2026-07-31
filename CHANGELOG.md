@@ -47,6 +47,17 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ### Fixed
 
+- **Regeneration bypassed `deps.maxTokens` and the agent's temperature (#92).**
+  `regenerateOne` hardcoded `temperature: 0.7` / `maxTokens: 2048`, ignoring the
+  `deps.maxTokens` honored on every other model path and flattening every
+  persona's tuned temperature — so a caller who lowered `maxTokens` for cost
+  control silently got 4× the budget on every (unbounded) regeneration, and the
+  per-agent temperature diversity lever was erased exactly when rescuing a
+  flagged idea. Regen now threads `deps.maxTokens` and recovers the originating
+  agent's **numeric** temperature by resolving it from `resolveAgents(deps)` via
+  `original.agentId` (sound now that ids are unambiguous, #87), keeping `0.7` /
+  `2048` only as fallbacks. The candidate's own `temperature` field (the persona
+  **label**, a string) is never forwarded as a sampling temperature.
 - **`meta` reported configured rounds and a misleading `ideasPerAgent` scalar (#91).**
   `meta.maxRounds` / `meta.sharing` reflected the *configured* round count, so a
   run with no `buildRound2Prompt` (only round 1 executes) still reported

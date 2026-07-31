@@ -21,6 +21,14 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ### Fixed
 
+- **CLI crashed at module load on any path containing a space (#88).**
+  `bin/ideate.mjs` derived the package.json path from `new URL(import.meta.url).pathname`,
+  which is percent-encoded — a space became `%20`, which `readFileSync` cannot
+  open — so `npx ideate` (the README's advertised zero-setup smoke test) died at
+  module load on any path with a space, including `--help` and `--version`.
+  `.pathname` also mangles Windows drive letters, UNC paths, and non-ASCII paths.
+  Now uses `fileURLToPath(import.meta.url)`. Adds `bin/ideate.test.mjs` (the CLI
+  had no test) which runs the binary from a directory whose name contains a space.
 - **Candidate ID collision when two agents share a persona (#87).** `defaultMakeId`
   keyed candidate ids on the agent's **persona label** (`ctx.temperature`) instead
   of its **agent id**. `resolveAgents` already de-collides a shared persona into

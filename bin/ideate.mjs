@@ -17,13 +17,17 @@
 //
 // Output: pretty-printed JSON { candidates: [...] } on stdout.
 
-import { pathToFileURL } from "node:url";
+import { pathToFileURL, fileURLToPath } from "node:url";
 import { isAbsolute, resolve, dirname, join } from "node:path";
 import { readFileSync } from "node:fs";
 
 import { ideateCore, foldHumanIdeas } from "../lib/ideate-core.mjs";
 
-const PKG_PATH = join(dirname(new URL(import.meta.url).pathname), "..", "package.json");
+// Use fileURLToPath, not URL.pathname: pathname is percent-encoded (a space
+// becomes %20, which readFileSync cannot open) and also mangles Windows drive
+// letters / UNC paths / non-ASCII. This runs at module top level, so getting it
+// wrong crashes every invocation — including --help and --version.
+const PKG_PATH = join(dirname(fileURLToPath(import.meta.url)), "..", "package.json");
 const VERSION = JSON.parse(readFileSync(PKG_PATH, "utf8")).version;
 
 function parseArgs(argv) {

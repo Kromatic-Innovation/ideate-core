@@ -28,6 +28,7 @@ import {
   createSubagentDispatchComplete,
   assertSubagentDispatchAvailable,
 } from "./index.mjs";
+import { withSamplingParamStrip } from "../sampling-params.mjs";
 
 // A generic, PERSONA-AWARE round-1 prompt builder. Round 1 differentiates agents
 // by persona (persona beats temperature), so the persona/stance is woven into
@@ -77,7 +78,12 @@ if (!process.env.IDEATE_SUBAGENT_SKIP_PREFLIGHT) {
   await assertSubagentDispatchAvailable({ dispatch });
 }
 
-export const complete = createSubagentDispatchComplete({ dispatch });
+// Strip-and-warn: on a model that rejects temperature/top_p/top_k (current
+// Anthropic frontier tiers), remove the param before the dispatch and warn once
+// per (model, param). Same pattern as the headless-cli adapter — a rejecting
+// model produces candidates, and an inert sampling knob is a documented no-op
+// rather than a silent one.
+export const complete = withSamplingParamStrip(createSubagentDispatchComplete({ dispatch }));
 
 export const deps = { complete, buildRound1Prompt };
 export default deps;

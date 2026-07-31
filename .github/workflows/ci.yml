@@ -15,4 +15,15 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 20
+      - name: Assert package-lock version matches package.json
+        run: |
+          node -e '
+            const pkg = require("./package.json").version;
+            const lock = require("./package-lock.json").version;
+            if (pkg !== lock) {
+              console.error(`version mismatch: package.json=${pkg} package-lock.json=${lock}. Run \`npm install --package-lock-only\`.`);
+              process.exit(1);
+            }
+            console.log(`version match: ${pkg}`);
+          '
       - run: node --test

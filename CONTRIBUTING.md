@@ -54,8 +54,11 @@ To cut a release:
 
 1. Move the `[Unreleased]` entries in `CHANGELOG.md` under a new `vX.Y.Z` heading.
 2. Bump `version` in `package.json` to match.
-3. Tag it: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-4. The [release workflow](.github/workflows/release.yml) verifies the tag matches
+3. Sync the lockfile: `npm install --package-lock-only` (updates
+   `package-lock.json`'s `version` to match — CI asserts the two agree, so a
+   forgotten sync fails the build rather than shipping a stale provenance record).
+4. Tag it: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+5. The [release workflow](.github/workflows/release.yml) verifies the tag matches
    `package.json`, runs the tests, and publishes to **public npm** with
    `--access public` (and provenance, once the repo is public).
 

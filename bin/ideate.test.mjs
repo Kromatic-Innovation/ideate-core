@@ -51,7 +51,10 @@ test("ideate --help exits 0 from a spaced path", () => {
 test("fold-only mode returns parseable JSON from a spaced path", () => {
   const { dir, bin } = spacedInstall();
   try {
-    const payload = JSON.stringify({ context: { slug: "demo" }, humanIdeas: ["a seed idea", "another"] });
+    const payload = JSON.stringify({
+      context: { slug: "demo" },
+      humanIdeas: ["a seed idea", "another"],
+    });
     const out = execFileSync(process.execPath, [bin], { encoding: "utf8", input: payload });
     const parsed = JSON.parse(out);
     assert.equal(parsed.mode, "fold-only");

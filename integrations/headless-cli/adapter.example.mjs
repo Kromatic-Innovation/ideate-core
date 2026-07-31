@@ -18,11 +18,17 @@
 
 import { createHeadlessCliComplete, assertHeadlessCliAvailable } from "./index.mjs";
 import { withSamplingParamStrip } from "../sampling-params.mjs";
+import { DEFAULT_IDEAS_PER_AGENT } from "../../lib/ideate-core.mjs";
 
 // A generic round-1 prompt builder. `context` may be a string or an object with
 // a `brief` (falls back to JSON-stringifying the context). Replace this with a
-// domain-specific builder for real use.
-export function buildRound1Prompt({ context, stance, ideasPerAgent = 6 } = {}) {
+// domain-specific builder for real use. Defaults ideasPerAgent to the core's
+// DEFAULT_IDEAS_PER_AGENT rather than a hardcoded literal so it can't drift.
+export function buildRound1Prompt({
+  context,
+  stance,
+  ideasPerAgent = DEFAULT_IDEAS_PER_AGENT,
+} = {}) {
   const brief =
     typeof context === "string"
       ? context

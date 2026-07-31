@@ -41,6 +41,15 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ### Added
 
+- **Test coverage for the shipped example prompt builders (#99).** The two
+  `adapter.example.mjs` `buildRound1Prompt` builders are the only prompt strings
+  the package ships, and neither was imported by any test — yet the `{"text": ...}`
+  reply contract they instruct is the one the README calls out as silently dropped
+  if violated. Added `integrations/example-builders.test.mjs` asserting each
+  builder emits the `{"text"}` instruction and interpolates the brief (a change
+  dropping the instruction now fails). Both builders also now default
+  `ideasPerAgent` to the core's `DEFAULT_IDEAS_PER_AGENT` instead of a hardcoded
+  `6`, so they can't drift from the default.
 - **Regeneration runs concurrently; convergence complexity documented (#98).**
   `regenerateOne`'s caller awaited one model call per flagged idea (sequential),
   while every other multi-call path is concurrent — a 15-flagged-idea round was

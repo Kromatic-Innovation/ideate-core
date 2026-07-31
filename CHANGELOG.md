@@ -17,6 +17,22 @@ API surface is the documented `ideateCore` return shape and the `./converge` /
 Each release is cut by tagging `vX.Y.Z` (matching `package.json`), which triggers
 the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
+## [Unreleased]
+
+### Fixed
+
+- **Candidate ID collision when two agents share a persona (#87).** `defaultMakeId`
+  keyed candidate ids on the agent's **persona label** (`ctx.temperature`) instead
+  of its **agent id**. `resolveAgents` already de-collides a shared persona into
+  distinct ids (`pragmatist` / `pragmatist-2`), but the id generator discarded
+  that, so any panel that repeated a persona — `agentCount > 5` (the default panel
+  wraps) or an explicit `deps.agents` array repeating a persona — produced
+  colliding candidate ids. The downstream `byId` maps in `feedback`/`converge`
+  then **silently dropped** the collided candidates (a 7-agent run could enter the
+  feedback loop with 7 ideas and leave with 5). Ids now key on `agentId`. This
+  changes the id **format** for the previously-colliding case (the human path,
+  `agentId: "human"`, is unchanged).
+
 ## [0.3.1] - 2026-07-24
 
 Release-pipeline verification patch. **No source, API, or behavioural changes** —

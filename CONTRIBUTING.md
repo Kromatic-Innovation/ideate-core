@@ -65,12 +65,13 @@ To cut a release:
    forgotten sync fails the build rather than shipping a stale provenance record).
 4. Tag it: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 5. The [release workflow](.github/workflows/release.yml) verifies the tag matches
-   `package.json`, runs the tests, and publishes to **public npm** with
-   `--access public` (and provenance, once the repo is public).
+   `package.json`, asserts the tagged commit is merged (an ancestor of `main`),
+   runs the tests, and publishes to **public npm** with `--access public` and npm
+   provenance attestations (`--provenance`, via OIDC trusted publishing).
 
-Validate the packaging any time without publishing via the workflow's manual
-**dry-run** (`workflow_dispatch`, `dry_run: true`) or locally with
-`npm publish --dry-run`.
+Validate the packaging any time without publishing by running
+`npm publish --dry-run` locally. (The release workflow runs only on a `v*` tag
+push — there is no manual `workflow_dispatch` / `dry_run` trigger.)
 
 **Rolling back a bad release.** npm forbids re-publishing a version once
 unpublished, and unpublish is only allowed within 72 hours of publish. So

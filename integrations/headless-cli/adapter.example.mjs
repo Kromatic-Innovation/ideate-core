@@ -17,6 +17,7 @@
 // adapter into your own harness that preflights itself).
 
 import { createHeadlessCliComplete, assertHeadlessCliAvailable } from "./index.mjs";
+import { withSamplingParamStrip } from "../sampling-params.mjs";
 
 // A generic round-1 prompt builder. `context` may be a string or an object with
 // a `brief` (falls back to JSON-stringifying the context). Replace this with a
@@ -43,7 +44,12 @@ if (!process.env.IDEATE_HEADLESS_SKIP_PREFLIGHT) {
   await assertHeadlessCliAvailable();
 }
 
-export const complete = createHeadlessCliComplete();
+// Strip-and-warn: on a model that rejects temperature/top_p/top_k (current
+// Anthropic frontier tiers), remove the param before the call and warn once per
+// (model, param) — so a rejecting model produces candidates instead of a silent
+// empty pool, and a caller learns their sampling knob is inert on that model
+// rather than mysteriously ignored.
+export const complete = withSamplingParamStrip(createHeadlessCliComplete());
 
 export const deps = { complete, buildRound1Prompt };
 export default deps;

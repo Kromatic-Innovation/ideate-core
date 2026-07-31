@@ -61,6 +61,18 @@ multi-persona collaboration measurably broadens the solution space (Wang et al.
 2023). Chain-of-thought prompting yields the highest idea variance of the
 strategies tested (Meincke et al. 2024).
 
+**Temperature is not a universal lever anymore.** Current Anthropic frontier
+models — Opus 5, Sonnet 5, Opus 4.8/4.7, Fable 5 — **reject** `temperature` (and
+`top_p` / `top_k`) with an HTTP 400; only Haiku 4.5 still accepts them. The core
+stays provider-agnostic and keeps sending `temperature`, so the per-model
+capability check lives in the **adapter**: both example adapters strip a rejected
+sampling param before the call and warn once per (model, param)
+(`integrations/sampling-params.mjs`). The practical consequence is that on a
+frontier model **persona is the only surviving structural diversity lever** — which
+is what the literature already favoured (persona beats temperature — Wang et al.
+2023). Set temperature freely for Haiku or a provider that honours it; on a model
+that rejects it, it is a documented no-op, not a silent one.
+
 ## 3. Cross-provider panel
 
 **Decision.** Each agent can be routed to a **different provider/model** (an

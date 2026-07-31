@@ -19,6 +19,21 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ## [Unreleased]
 
+### Added
+
+- **Adapter-side strip-and-warn for rejected sampling params (#89).** Current
+  Anthropic frontier models (Opus 5, Sonnet 5, Opus 4.8/4.7, Fable 5) reject
+  `temperature` / `top_p` / `top_k` with HTTP 400; Haiku 4.5 still accepts them.
+  Because the engine swallows per-agent throws, a default-panel run against a
+  rejecting model previously produced `candidates: []` with no error — the
+  silent-empty-pool bug. New `integrations/sampling-params.mjs`
+  (`withSamplingParamStrip`, `modelAcceptsSamplingParams`) strips a rejected
+  sampling param before the call and warns **once per (model, param)**; both
+  example adapters now wire it in. The **core is unchanged** — it keeps sending
+  `temperature`, so no model allowlist enters `lib/` and the injectable-client
+  design is preserved. `docs/ideation-method.md` and the README no longer present
+  temperature as universally available.
+
 ### Fixed
 
 - **CLI crashed at module load on any path containing a space (#88).**

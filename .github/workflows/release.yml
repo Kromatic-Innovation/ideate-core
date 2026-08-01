@@ -8,8 +8,8 @@ name: Release
 # It is versioned in code-workspace-config at `templates/release-npm.yml` and
 # synced into each npm repo by `scripts/sync_promote_workflows.py` (mirror of
 # `derive_repo_configs.py` / the `promote-main.yml` sync). A CI drift-check
-# (`.github/workflows/promote-workflow-drift.yml`) reports divergence between a
-# repo's committed copy and this canonical content.
+# (`code-workspace-config/.github/workflows/promote-workflow-drift.yml`) reports
+# divergence between a repo's committed copy and this canonical content.
 #
 # To change the npm publish flow, edit THIS template and re-run the sync
 # script — never hand-edit a repo's `.github/workflows/release.yml`.

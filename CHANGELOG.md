@@ -27,6 +27,14 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ### Chore
 
+- **Added the missing `./integrations/sampling-params` export subpath (Zenodotus 0.4.0 gate finding, non-blocking).**
+  `integrations/sampling-params.mjs` exports `withSamplingParamStrip` and
+  `modelAcceptsSamplingParams` — real, tested functions consumed by both bundled
+  example adapters — but unlike `./integrations/headless-cli` and
+  `./integrations/subagent-dispatch` it had no `package.json` `exports` entry, so
+  an external adapter author had no supported import path for it. Added
+  `"./integrations/sampling-params": "./integrations/sampling-params.mjs"` to
+  `exports`.
 - **Synced `package-lock.json` to `0.3.1` and added a CI version-match assertion (ideate-core#93).**
   The lockfile was left at `0.3.0` when `0.3.1` bumped `package.json`. `npm ci`
   tolerates a root-version mismatch so the release path was not blocked, but the

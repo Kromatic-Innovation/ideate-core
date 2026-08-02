@@ -35,7 +35,7 @@ const builders = [
 ];
 
 for (const [name, build] of builders) {
-  test(`${name} example builder emits the {"text"} contract and interpolates the brief (#99)`, () => {
+  test(`${name} example builder emits the {"text"} contract and interpolates the brief (ideate-core#99)`, () => {
     const prompt = build({
       context: { brief: "UNIQUE_BRIEF_MARKER_XYZ" },
       stance: "STANCE",
@@ -49,7 +49,7 @@ for (const [name, build] of builders) {
     assert.match(prompt, /UNIQUE_BRIEF_MARKER_XYZ/, `${name}: must interpolate the brief`);
   });
 
-  test(`${name} example builder defaults ideasPerAgent to DEFAULT_IDEAS_PER_AGENT (#99)`, () => {
+  test(`${name} example builder defaults ideasPerAgent to DEFAULT_IDEAS_PER_AGENT (ideate-core#99)`, () => {
     const prompt = build({ context: { brief: "b" } });
     assert.match(
       prompt,
@@ -58,7 +58,7 @@ for (const [name, build] of builders) {
     );
   });
 
-  test(`${name} example builder accepts a string context as the brief (#99)`, () => {
+  test(`${name} example builder accepts a string context as the brief (ideate-core#99)`, () => {
     const prompt = build({ context: "PLAIN_STRING_BRIEF" });
     assert.match(prompt, /PLAIN_STRING_BRIEF/, `${name}: string context is the brief`);
   });

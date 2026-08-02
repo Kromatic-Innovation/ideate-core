@@ -19,15 +19,11 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ## [Unreleased]
 
-### Deprecated
+### Removed
 
-- **`panelistToFeedback` will be removed in `0.4.0` (ideate-core#96).** The alias (deprecated
-  since `0.2.0`, preserving the `0.1.0` export name for
-  `import { panelistToFeedback } from "ideate-core/feedback"`) now has a named
-  removal version instead of an open-ended "future minor". Migrate to
-  `exampleAdapterFromPanelist` — the two are identical. `0.4.0` is the next minor,
-  and pre-1.0 minors may drop a deprecated export (see the versioning convention
-  above). The alias remains fully functional and tested until then.
+- **Removed `panelistToFeedback` back-compat alias (ideate-core#120).** Deprecated
+  since `0.2.0`, this alias for `exampleAdapterFromPanelist` is now gone — import
+  `exampleAdapterFromPanelist` from `ideate-core/feedback` instead.
 
 ### Chore
 
@@ -64,7 +60,7 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 - **Formatter check in CI (ideate-core#97).** Per the maintainer decision, added a
   format-check-only step (Prettier, default rules + `printWidth: 100` to match the
   existing style — no opinionated lint rules). `npm run format` / `npm run
-  format:check` scripts, a `prettier` **dev**-dependency (the library still ships
+format:check` scripts, a `prettier` **dev**-dependency (the library still ships
   zero runtime deps), and CI runs `format:check` alongside `node --test`. This
   commit establishes the formatting baseline (formatting-only, no behavioural
   change) so an outside contributor has a mechanical style target.
@@ -74,7 +70,7 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
   all-failed run resolved successfully with `candidates: []` — no error, no
   counter. `meta` now reports `agentsAttempted` and `agentsFailed` (round-1
   panel), and `ideateCore` accepts an optional `deps.onAgentError(err, {agentId,
-  round})` callback. `runFeedbackLoop` gains `feedback.evaluatorFailures` and a
+round})` callback. `runFeedbackLoop` gains `feedback.evaluatorFailures` and a
   `deps.onEvaluatorError` callback so a **thrown** evaluator is distinguishable
   from a satisfied one (the `safeEvaluate` gap). The per-agent no-throw
   robustness contract is unchanged — these only surface what was already being
@@ -113,7 +109,7 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
   `2048` only as fallbacks. The candidate's own `temperature` field (the persona
   **label**, a string) is never forwarded as a sampling temperature.
 - **`meta` reported configured rounds and a misleading `ideasPerAgent` scalar (ideate-core#91).**
-  `meta.maxRounds` / `meta.sharing` reflected the *configured* round count, so a
+  `meta.maxRounds` / `meta.sharing` reflected the _configured_ round count, so a
   run with no `buildRound2Prompt` (only round 1 executes) still reported
   `sharing: ["blind","pool"]` — recording a brainwriting round that never ran, in
   the very field that asserts real brainwriting occurred. `meta` now adds

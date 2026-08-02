@@ -12,6 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      # Public-safe leak scan, folded into the required "CI Required" gate so a
+      # hit blocks merge/promotion (not left advisory). The standalone
+      # public-safe-lint.yml workflow additionally covers fork PRs; this step is
+      # what makes the check part of this repo's required status set. Uses the
+      # adopted canonical scanner, unmodified. See ideate-core#118.
+      - name: Public-safe lint (org-agnostic leak shapes)
+        run: bash public-safe-lint.sh .
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 20

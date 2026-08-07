@@ -7,8 +7,23 @@ name: Promote Main
 # develop-main`). It is versioned in code-workspace-config at
 # `templates/promote-main.yml` and synced into each platform repo by
 # `scripts/sync_promote_workflows.py` (mirror of `derive_repo_configs.py`).
-# A CI drift-check (`code-workspace-config/.github/workflows/promote-workflow-drift.yml`)
-# fails the build if a repo's committed copy diverges from this canonical content.
+#
+# THIS COPY IS GENERATED. If you are reading this in a consumer repo, do not
+# hand-edit it — the next sync overwrites any local change with canonical
+# content again. Edit `templates/promote-main.yml` in code-workspace-config
+# instead.
+#
+# Enforcement is PRODUCER-SIDE, in cwc, not in this consumer repo:
+#   - `code-workspace-config/.github/workflows/promote-workflow-drift.yml`
+#     (`--check`) is BLOCKING, but only for cwc's OWN committed copy of this
+#     workflow against `templates/promote-main.yml` — it does not run here and
+#     has no visibility into any consumer repo's copy.
+#   - Fleet-wide conformance (every consumer's committed copy vs. canonical) is
+#     checked by cwc's `fleet-drift-guard.yml` / `scripts/check_fleet_drift.py`
+#     ("property 4", cwc#1889) — currently REPORT-ONLY, not blocking.
+# In short: nothing in THIS repo's CI enforces that this file matches
+# canonical. If it has drifted, cwc's fleet-drift-guard should catch it on its
+# next scheduled run and the fix is a re-sync from cwc, never a local edit.
 #
 # To change the promotion contract, edit THIS template and re-run the sync
 # script — never hand-edit a repo's `.github/workflows/promote-main.yml`.

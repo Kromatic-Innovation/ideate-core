@@ -7,9 +7,23 @@ name: Release
 # `publishingScheme: npm` — currently ideate-core / panelist / tickle-stick).
 # It is versioned in code-workspace-config at `templates/release-npm.yml` and
 # synced into each npm repo by `scripts/sync_promote_workflows.py` (mirror of
-# `derive_repo_configs.py` / the `promote-main.yml` sync). A CI drift-check
-# (`code-workspace-config/.github/workflows/promote-workflow-drift.yml`) reports
-# divergence between a repo's committed copy and this canonical content.
+# `derive_repo_configs.py` / the `promote-main.yml` sync).
+#
+# THIS COPY IS GENERATED. If you are reading this in a consumer repo, do not
+# hand-edit it — the next sync overwrites any local change with canonical
+# content again. Edit `templates/release-npm.yml` in code-workspace-config
+# instead.
+#
+# Enforcement is PRODUCER-SIDE, in cwc, not in this consumer repo:
+#   `code-workspace-config/.github/workflows/promote-workflow-drift.yml`
+#   (`--check --workflow release-npm`) reports divergence between a repo's
+#   committed copy and this canonical content, but that check only inspects
+#   npm-publisher repos that happen to be checked out alongside cwc — it does
+#   not run in this repo's own CI and has no visibility into this copy from
+#   here. In cwc's own (single-repo) CI it inspects zero repos by design; a
+#   full-workspace `--check` is what actually catches drift in ideate-core /
+#   panelist / tickle-stick. If this file has drifted, the fix is a re-sync
+#   from cwc, never a local edit.
 #
 # To change the npm publish flow, edit THIS template and re-run the sync
 # script — never hand-edit a repo's `.github/workflows/release.yml`.
@@ -118,9 +132,16 @@ jobs:
       # is now npm 12, which dropped Node 20 (requires node >=22) and fails
       # this step with EBADENGINE. npm 11.x still supports Node 20
       # (^20.17.0) and satisfies the >= 11.5.1 trusted-publishing floor.
+      # cwc#2030: pinned to an EXACT version (not the floating `npm@11`
+      # range) — this step performs the OIDC↔registry token exchange for
+      # Trusted Publishing, so an upstream 11.x regression must not land
+      # unannounced in the publish path. 11.19.0 was the newest 11.x at
+      # pin time (`npm view npm versions --json`), satisfies the >= 11.5.1
+      # floor, is < 12, and declares Node 20 support (`^20.17.0 || >=22.9.0`
+      # per `npm view npm@11.19.0 engines`). Bump this pin deliberately.
       - name: Upgrade npm to support trusted publishing
         run: |
-          npm install -g npm@11
+          npm install -g npm@11.19.0
           npm --version
 
       - name: Install

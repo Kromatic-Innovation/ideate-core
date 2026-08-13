@@ -87,16 +87,17 @@ on:
         required: false
         default: ''
 
-permissions:
-  contents: write
-  actions: read
-  statuses: read
-  checks: read
+permissions: {}
 
 jobs:
   promote:
     name: Fast-forward Promote develop → main
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+      statuses: read
+      checks: read
     outputs:
       promoted_sha: ${{ steps.set_promoted_sha.outputs.promoted_sha }}
     env:
@@ -164,10 +165,19 @@ jobs:
           echo "source_sha=$SOURCE_SHA" >> "$GITHUB_ENV"
           echo "target_sha=$TARGET_SHA" >> "$GITHUB_ENV"
 
+          # cwc#2283: a duplicate/racing promotion (e.g. `autoPromoteToMain`
+          # firing seconds after an orchestrator's own trigger already landed
+          # the same SHA) is NOT a promotion failure — it is a no-op that
+          # arrived late. Distinguish it from a genuine failure: exit 0 with a
+          # clear "nothing to promote" notice and skip the CI-gate + push
+          # steps below, rather than exiting 1 and reporting a red run for
+          # work that already succeeded.
           if [ "$SOURCE_SHA" = "$TARGET_SHA" ]; then
-            echo "::error::${SOURCE_BRANCH} and ${TARGET_BRANCH} are already at the same SHA. Nothing to promote."
-            exit 1
+            echo "::notice::${SOURCE_BRANCH} and ${TARGET_BRANCH} are already at ${SOURCE_SHA}. Nothing to promote (no-op)."
+            echo "NOTHING_TO_PROMOTE=true" >> "$GITHUB_ENV"
+            exit 0
           fi
+          echo "NOTHING_TO_PROMOTE=false" >> "$GITHUB_ENV"
 
           if ! git merge-base --is-ancestor "$TARGET_SHA" "$SOURCE_SHA"; then
             echo "::error::Fast-forward precondition failed: ${TARGET_BRANCH} is not an ancestor of ${SOURCE_BRANCH}. Open a 'chore: sync ${SOURCE_BRANCH} with ${TARGET_BRANCH}' PR first."
@@ -175,6 +185,7 @@ jobs:
           fi
 
       - name: Enforce to_main gate — CI Required green on source SHA
+        if: env.NOTHING_TO_PROMOTE != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -209,6 +220,7 @@ jobs:
         run: echo "promoted_sha=${source_sha}" >> "$GITHUB_OUTPUT"
 
       - name: Push fast-forward promotion via refs API
+        if: env.NOTHING_TO_PROMOTE != 'true'
         env:
           # App-minted token required because main's branch protection rejects
           # direct ref writes by the default GITHUB_TOKEN with HTTP 422. The
@@ -240,6 +252,11 @@ jobs:
         run: |
           {
             echo "## Main Promotion"
+            if [ "${NOTHING_TO_PROMOTE:-false}" = "true" ]; then
+              echo "- status: no-op — ${SOURCE_BRANCH} and ${TARGET_BRANCH} were already at \`${source_sha}\`. Nothing to promote (cwc#2283)."
+            else
+              echo "- status: promoted"
+            fi
             echo "- repository: \`${GITHUB_REPOSITORY}\`"
             echo "- initiated_by: \`${GITHUB_ACTOR}\`"
             echo "- source_branch: \`${SOURCE_BRANCH}\`"

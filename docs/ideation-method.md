@@ -145,7 +145,13 @@ continuous exposure produces (Sio & Ormerod 2009; Kohn & Smith 2011).
 the generators) critiques the pool with a per-idea contract
 (`keep` / `revise` / `kill`, split-axis `scores`, `dealKillers`, `keepReasons`);
 the engine runs a **targeted regeneration** of only the flagged ideas against
-their specific critique, then re-dedupes and re-clusters.
+their specific critique, then merges the regenerated ideas back into the pool.
+That merge is an **id-keyed collision guard**, not a similarity collapse: each
+regenerated idea is minted with a fresh id derived from the original, so it
+never collapses against the idea it revises, and near-duplicate *text* is not
+examined here. Collapsing similar ideas, and clustering, both belong to the
+optional convergence stage — semantic dedup, then clustering, then split-axis
+selection — which runs once after this loop, never inside it.
 
 **Why.** This is the **Delphi method** — iterated, *controlled* feedback between
 rounds — which improves group judgment over one-shot elicitation (Dalkey &

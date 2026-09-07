@@ -48,6 +48,24 @@ hints you may ignore:
 | `effort`        | the agent's reasoning-effort override, if set (no default — absent, not a fixed value, when the agent spec didn't set one) |
 | `round`         | which build-on round this request is for — present from round 2 onward only; absent (not `1`) on round-1 requests |
 
+**"Optional routing hints you may ignore" is a default, not a mandate.** Whether
+your adapter forwards a field is a transport decision, not a core one — the
+engine never interprets these values, it only carries them to your `complete()`
+(ideate-core#146). Forward what your backend can actually express; the two
+bundled adapters land at different points on that spectrum precisely because
+their backends differ (ideate-core#151):
+
+| field         | subagent-dispatch adapter | headless-CLI adapter                                  |
+| ------------- | -------------------------- | ------------------------------------------------------- |
+| `model`       | forwarded                  | forwarded, as `--model <value>`                          |
+| `effort`      | forwarded                  | forwarded, as `--effort <value>` (identical ladder — no mapping) |
+| `temperature` | forwarded                  | **not forwarded** — the CLI has no flag for it           |
+| `maxTokens`   | not applicable (host dispatch has no token-ceiling knob) | **not forwarded** — the CLI's `--max-budget-usd` is a dollar spend cap, not a token cap, and mapping onto it would silently change its meaning |
+
+A missing CLI/host flag for a field is a legitimate reason to drop it — just
+say so in your adapter's header comment, the way both bundled adapters do, so
+the next reader doesn't reopen the question.
+
 ### The return value
 
 - **Success:** `{ ok: true, text: "<string>" }`. `text` is the raw model reply;
@@ -218,7 +236,10 @@ inject their I/O primitive so their tests stay hermetic — read them as templat
   loud-failure discipline end to end: `createHeadlessCliComplete()` throws on
   `ENOENT` / non-zero exit / timeout / `is_error`, and
   `assertHeadlessCliAvailable()` is the `--version` preflight. `spawn` is
-  injectable for hermetic tests.
+  injectable for hermetic tests. Forwards `model`/`effort` as `--model`/
+  `--effort` for routing parity with a metered-API adapter (ideate-core#151);
+  a per-agent request field overrides a same-named flag already present in
+  caller-supplied `options.args`.
 - **[subagent-dispatch](../../integrations/subagent-dispatch/README.md)** —
   `complete()` forwards each persona agent to a **host's own subagent /
   Task-dispatch** primitive (one dispatch per persona — the natural fit for

@@ -18,6 +18,55 @@
 //   - FAILS LOUDLY. A missing or unauthenticated CLI, a non-zero exit, or an
 //     unparseable reply throws a descriptive Error — never a silent empty pool.
 //
+// ── Routing parity (ideate-core#151) ────────────────────────────────────────
+// This adapter aims for routing PARITY with a metered-API adapter, not a
+// reduced feature set — the point of running on the CLI is the *credential*
+// (no second auth to manage), not fewer routing knobs. Of the engine's
+// per-agent request fields:
+//   - `model`   → forwarded as `--model <value>` (accepts the CLI's aliases —
+//                 `opus`/`sonnet`/`fable` — or a full model name).
+//   - `effort`  → forwarded as `--effort <value>`. The CLI's ladder (`low,
+//                 medium, high, xhigh, max`) is IDENTICAL to the API's
+//                 `output_config.effort`, so it passes through verbatim with
+//                 no provider-specific mapping.
+//   - `temperature`, `maxTokens` → NOT forwarded. The CLI has no flag for
+//                 either. `--max-budget-usd` exists but is a dollar SPEND cap,
+//                 not a token cap — do not map `maxTokens` onto it; that would
+//                 silently change its meaning.
+//   - `persona`, `strategy`, `ideasPerAgent` → not request-shaped for this
+//                 adapter at all; the engine's prompt builders already encode
+//                 them into the prompt text, so there is nothing to forward.
+// Both fields are OPTIONAL and independent: absent on the request means
+// absent on the CLI invocation — this adapter never synthesizes a default or
+// emits a bare flag with no value.
+//
+// Caller-supplied `options.args` vs. these per-agent fields: when a caller's
+// own `args` already contains `--model`/`--effort` (either as two elements,
+// `--model value`, or one, `--model=value`) AND the request carries that same
+// field, the PER-AGENT REQUEST FIELD WINS — the caller's entry is stripped out
+// of the base args and re-appended with the request's value in the
+// `--flag value` form. Rationale: distinguishing routing per agent is the
+// entire point of a panel; a caller who wants a single fixed model for every
+// agent should leave it off the per-agent request instead of baking it into
+// `args`. If the request field is absent, the caller's `args` are left
+// completely untouched. A forwarded value must be a plain string that does
+// not itself look like a flag (does not start with `-`) — anything else is a
+// loud throw, never forwarded, so a routing value can never swallow or
+// duplicate an adjacent flag.
+//
+// `options.args`'s "replace DEFAULT_ARGS" semantics has ONE guaranteed
+// exception (ideate-core#152 review, finding 1): `-p` and `--output-format`
+// are always present in the final argv, added — never overriding a value
+// already there — only when a caller's `args` omits them entirely. Without
+// this, a caller `args` missing `--output-format json` produced non-JSON
+// prose on stdout that `defaultExtractText` tolerates as a fallback and
+// returns as `{ok:true, text:"<prose>"}` with no throw anywhere — exactly the
+// silent-empty/junk-pool hazard this adapter exists to prevent, on a path no
+// existing test exercised (every prior caller-`args` test happened to include
+// both flags already). A caller supplying its own `extractText` and wanting
+// `--output-format text` keeps that choice: this only adds a flag that is
+// completely missing, never touches one the caller already set.
+//
 // ── The silent-empty-pool hazard (important) ────────────────────────────────
 // ideate-core's engine wraps every per-agent `complete()` call in a try/catch
 // and DROPS an agent that throws (robustness: one bad model reply must not sink
@@ -47,6 +96,67 @@ const DEFAULT_COMMAND = "claude";
 const DEFAULT_ARGS = ["-p", "--output-format", "json"];
 const DEFAULT_PROBE_ARGS = ["--version"];
 const DEFAULT_TIMEOUT_MS = 120000;
+
+/** Remove `flag` (and the value that follows it) OR a single `flag=value`
+ *  element from an args array, if present. Used to let a per-agent request
+ *  field override a caller-supplied `args` entry for the same flag without
+ *  leaving a stale, conflicting entry behind — whichever of the two
+ *  equally-standard CLI forms (`--model value` or `--model=value`) the
+ *  caller used. */
+function stripFlagPair(args, flag) {
+  const eqPrefix = `${flag}=`;
+  const out = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === flag) {
+      i++; // also skip the value that follows the flag
+      continue;
+    }
+    if (typeof args[i] === "string" && args[i].startsWith(eqPrefix)) {
+      continue; // `--flag=value` is a single element — no separate value token
+    }
+    out.push(args[i]);
+  }
+  return out;
+}
+
+/** True if `flag` appears in `args` either as a bare token or as the single-
+ *  token `flag=value` form. */
+function hasFlag(args, flag) {
+  return args.some((a) => a === flag || (typeof a === "string" && a.startsWith(`${flag}=`)));
+}
+
+/**
+ * Guarantee `-p` and `--output-format` are present in the final argv, WITHOUT
+ * overriding a value the caller already supplied — see the file header
+ * ("ideate-core#152 review, finding 1") for why this exists. Only ever ADDS a
+ * flag that is entirely missing from `args`; never touches one already there.
+ */
+function ensureRequiredFlags(args) {
+  let out = args;
+  if (!hasFlag(out, "-p")) out = [...out, "-p"];
+  if (!hasFlag(out, "--output-format")) out = [...out, "--output-format", "json"];
+  return out;
+}
+
+/**
+ * Validate a routing field's value before it is forwarded as a CLI flag
+ * argument. Throws HeadlessCliError (never silently coerces or drops) when
+ * the value is not a plain string, or when it looks like a flag itself
+ * (starts with `-`) — the latter would otherwise let the value swallow or
+ * duplicate an adjacent flag in the argv (ideate-core#152 review, finding 4).
+ */
+function assertForwardableRoutingValue(fieldName, flag, value) {
+  if (typeof value !== "string") {
+    throw new HeadlessCliError(
+      `headless-cli adapter: req.${fieldName} must be a string to forward as ${flag} — got ${typeof value}. Refusing to forward a non-string value to the CLI.`,
+    );
+  }
+  if (value.startsWith("-")) {
+    throw new HeadlessCliError(
+      `headless-cli adapter: req.${fieldName} value ${JSON.stringify(value)} looks like a flag, not a value — refusing to forward it as ${flag}'s argument.`,
+    );
+  }
+}
 
 function truncate(s, max = 500) {
   const str = String(s == null ? "" : s);
@@ -177,16 +287,23 @@ export function defaultExtractText(stdout) {
  * @param {object} [options]
  *   @param {string}   [options.command="claude"]  the executable to run.
  *   @param {string[]} [options.args]  args passed to it (default: headless JSON print).
+ *     Overrides the default array, but `-p` and `--output-format` are always
+ *     guaranteed present — added only if your array omits them entirely,
+ *     never overriding a value you did set (see file header, finding 1).
  *   @param {function} [options.spawn]  child_process.spawn shim (INJECT for tests).
  *   @param {number}   [options.timeoutMs=120000]  hard kill after this long.
  *   @param {string}   [options.cwd]  working directory for the CLI.
  *   @param {object}   [options.env]  env for the CLI (defaults to process.env).
  *   @param {function} [options.extractText]  (stdout)=>string reply extractor.
- * @returns {(req:{prompt:string})=>Promise<{ok:true,text:string}>}
+ * @returns {(req:{prompt:string, model?:string, effort?:string})=>Promise<{ok:true,text:string}>}
+ *   `req.model` forwards as `--model <value>`; `req.effort` forwards as
+ *   `--effort <value>`; both override a same-named flag in `options.args`.
+ *   `req.temperature`/`req.maxTokens` are accepted (per the engine's request
+ *   shape) but not forwarded — see the file header for why.
  */
 export function createHeadlessCliComplete(options = {}) {
   const command = options.command || DEFAULT_COMMAND;
-  const args = Array.isArray(options.args) ? options.args : DEFAULT_ARGS;
+  const baseArgs = Array.isArray(options.args) ? options.args : DEFAULT_ARGS;
   const spawn = typeof options.spawn === "function" ? options.spawn : realSpawn;
   const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : DEFAULT_TIMEOUT_MS;
   const cwd = options.cwd;
@@ -200,9 +317,36 @@ export function createHeadlessCliComplete(options = {}) {
       throw new HeadlessCliError("headless-cli adapter: req.prompt (non-empty string) is required");
     }
 
+    // Per-agent routing parity (ideate-core#151): forward `model`/`effort`
+    // when present, overriding a same-named flag already in `baseArgs`.
+    // Absent stays absent — never synthesize a default or a bare flag.
+    let callArgs = baseArgs;
+    if (req.model) {
+      assertForwardableRoutingValue("model", "--model", req.model);
+      callArgs = stripFlagPair(callArgs, "--model");
+      callArgs = [...callArgs, "--model", req.model];
+    }
+    if (req.effort) {
+      assertForwardableRoutingValue("effort", "--effort", req.effort);
+      callArgs = stripFlagPair(callArgs, "--effort");
+      callArgs = [...callArgs, "--effort", req.effort];
+    }
+
+    // ideate-core#152 review round 2, finding 1: this MUST run after the
+    // strip/append above, not once at construction on `baseArgs`. Applying it
+    // to `baseArgs` up front means a caller `args` ending in a bare, value-
+    // taking flag (e.g. `["--model"]`) gets `-p`/`--output-format json`
+    // appended directly after that bare flag — positioning the injected `-p`
+    // exactly where `stripFlagPair` above expects to find (and consume) the
+    // flag's value, deleting it. Applying it here, to the post-strip
+    // `callArgs`, guarantees the two required flags in the FINAL argv
+    // regardless of what shape the caller's `args` or the per-agent
+    // model/effort forwarding left behind.
+    callArgs = ensureRequiredFlags(callArgs);
+
     const { stdout, stderr, code, signal, spawnError, timedOut } = await runProcess({
       command,
-      args,
+      args: callArgs,
       input: prompt,
       spawn,
       timeoutMs,

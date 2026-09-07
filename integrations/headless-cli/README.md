@@ -35,7 +35,11 @@ const { candidates } = await ideateCore(
 `createHeadlessCliComplete(options)` accepts `{ command, args, spawn, timeoutMs,
 cwd, env, extractText }` — override `command`/`args` to point at a different
 headless CLI, or `extractText` to parse a different output envelope. `spawn` is
-injectable so your own tests can stay hermetic.
+injectable so your own tests can stay hermetic. Whatever you pass for `args`,
+`-p` and `--output-format` (defaulting to `json`) are always guaranteed present
+in the final invocation — added only when your array omits them entirely,
+never overriding a value you set — so if you want `--output-format text`
+instead, put it in `args` yourself and pair it with your own `extractText`.
 
 ## Use it from the CLI (`--adapter`)
 

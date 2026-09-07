@@ -303,7 +303,7 @@ export function defaultExtractText(stdout) {
  */
 export function createHeadlessCliComplete(options = {}) {
   const command = options.command || DEFAULT_COMMAND;
-  const baseArgs = ensureRequiredFlags(Array.isArray(options.args) ? options.args : DEFAULT_ARGS);
+  const baseArgs = Array.isArray(options.args) ? options.args : DEFAULT_ARGS;
   const spawn = typeof options.spawn === "function" ? options.spawn : realSpawn;
   const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : DEFAULT_TIMEOUT_MS;
   const cwd = options.cwd;
@@ -331,6 +331,18 @@ export function createHeadlessCliComplete(options = {}) {
       callArgs = stripFlagPair(callArgs, "--effort");
       callArgs = [...callArgs, "--effort", req.effort];
     }
+
+    // ideate-core#152 review round 2, finding 1: this MUST run after the
+    // strip/append above, not once at construction on `baseArgs`. Applying it
+    // to `baseArgs` up front means a caller `args` ending in a bare, value-
+    // taking flag (e.g. `["--model"]`) gets `-p`/`--output-format json`
+    // appended directly after that bare flag — positioning the injected `-p`
+    // exactly where `stripFlagPair` above expects to find (and consume) the
+    // flag's value, deleting it. Applying it here, to the post-strip
+    // `callArgs`, guarantees the two required flags in the FINAL argv
+    // regardless of what shape the caller's `args` or the per-agent
+    // model/effort forwarding left behind.
+    callArgs = ensureRequiredFlags(callArgs);
 
     const { stdout, stderr, code, signal, spawnError, timedOut } = await runProcess({
       command,

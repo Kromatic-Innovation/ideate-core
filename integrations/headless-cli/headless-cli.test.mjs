@@ -286,6 +286,34 @@ test("a trailing bare --model with no value is stripped safely (no crash, no str
   assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--model", "opus"]);
 });
 
+// Regression (ideate-core#152 review round 3, finding 1): the PREVIOUS shape
+// of this test put `-p`/`--output-format json` BEFORE the trailing bare
+// `--model`, so the token `stripFlagPair` consumed as `--model`'s "value" was
+// nothing — it passed even when `ensureRequiredFlags` ran once at
+// construction and got its injected `-p` eaten by the very strip it was
+// supposed to survive. These two cases put the bare flag LAST with no
+// required flags already present, which is exactly the shape that broke:
+// `ensureRequiredFlags` (if applied to `baseArgs` up front) would append
+// `-p`/`--output-format json` directly after the bare flag, positioning `-p`
+// exactly where the strip expects to find — and delete — the flag's value.
+test("a caller args array that is ONLY a trailing bare --model still ends up with -p in the final argv", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({ spawn, args: ["--model"] });
+  await complete({ prompt: "x", model: "opus" });
+  const argv = spawn.calls[0].args;
+  assert.ok(argv.includes("-p"), `-p missing from argv: ${JSON.stringify(argv)}`);
+  assert.deepEqual(argv, ["--model", "opus", "-p", "--output-format", "json"]);
+});
+
+test("a caller args array that is ONLY a trailing bare --effort still ends up with -p in the final argv", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({ spawn, args: ["--effort"] });
+  await complete({ prompt: "x", effort: "high" });
+  const argv = spawn.calls[0].args;
+  assert.ok(argv.includes("-p"), `-p missing from argv: ${JSON.stringify(argv)}`);
+  assert.deepEqual(argv, ["--effort", "high", "-p", "--output-format", "json"]);
+});
+
 test("repeated --model occurrences in caller args all collapse to the one forwarded pair", async () => {
   const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
   const complete = createHeadlessCliComplete({
@@ -453,7 +481,34 @@ test("runProcess resolves a spawnError envelope on synchronous spawn throw", asy
 // What IS specific to this adapter, and worth pinning, is the shape of the
 // argv it hands the CLI — drive the real engine through a fake spawn and
 // assert every single emitted argv satisfies the CLI-invocation invariants.
-test("every argv the real engine drives through this adapter satisfies the CLI-invocation invariants", async () => {
+function assertArgvInvariants(argv) {
+  assert.ok(argv.includes("-p"), `argv missing -p: ${JSON.stringify(argv)}`);
+  const ofIdx = argv.indexOf("--output-format");
+  assert.ok(ofIdx !== -1, `argv missing --output-format: ${JSON.stringify(argv)}`);
+  assert.equal(
+    argv[ofIdx + 1],
+    "json",
+    `--output-format not immediately followed by json: ${JSON.stringify(argv)}`,
+  );
+
+  for (const flag of ["--model", "--effort"]) {
+    const occurrences = argv.filter((a) => a === flag).length;
+    assert.ok(
+      occurrences <= 1,
+      `argv has ${occurrences} occurrences of ${flag}: ${JSON.stringify(argv)}`,
+    );
+    const idx = argv.indexOf(flag);
+    if (idx !== -1) {
+      const value = argv[idx + 1];
+      assert.ok(
+        typeof value === "string" && !value.startsWith("--"),
+        `${flag} not followed by a value token: ${JSON.stringify(argv)}`,
+      );
+    }
+  }
+}
+
+async function driveEngineAndCollectArgv(completeOptions) {
   const spawnedArgs = [];
   const spawn = makeFakeSpawn({
     stdout: JSON.stringify({ is_error: false, result: '[{"text":"idea"}]' }),
@@ -463,7 +518,7 @@ test("every argv the real engine drives through this adapter satisfies the CLI-i
     spawnedArgs.push(args[1]); // args[1] is the argv array `spawn(command, args, opts)`
     return spawn(...args);
   };
-  const complete = createHeadlessCliComplete({ spawn: recordingSpawn });
+  const complete = createHeadlessCliComplete({ ...completeOptions, spawn: recordingSpawn });
 
   await ideateCore(
     { context: { brief: "ways to promote a product launch" } },
@@ -481,33 +536,29 @@ test("every argv the real engine drives through this adapter satisfies the CLI-i
   );
 
   assert.ok(spawnedArgs.length >= 3, "expected multiple real engine-driven CLI invocations");
+  return spawnedArgs;
+}
 
-  for (const argv of spawnedArgs) {
-    assert.ok(argv.includes("-p"), `argv missing -p: ${JSON.stringify(argv)}`);
-    const ofIdx = argv.indexOf("--output-format");
-    assert.ok(ofIdx !== -1, `argv missing --output-format: ${JSON.stringify(argv)}`);
-    assert.equal(
-      argv[ofIdx + 1],
-      "json",
-      `--output-format not immediately followed by json: ${JSON.stringify(argv)}`,
-    );
+test("every argv the real engine drives through this adapter (default args) satisfies the CLI-invocation invariants", async () => {
+  const spawnedArgs = await driveEngineAndCollectArgv({});
+  for (const argv of spawnedArgs) assertArgvInvariants(argv);
+});
 
-    for (const flag of ["--model", "--effort"]) {
-      const occurrences = argv.filter((a) => a === flag).length;
-      assert.ok(
-        occurrences <= 1,
-        `argv has ${occurrences} occurrences of ${flag}: ${JSON.stringify(argv)}`,
-      );
-      const idx = argv.indexOf(flag);
-      if (idx !== -1) {
-        const value = argv[idx + 1];
-        assert.ok(
-          typeof value === "string" && !value.startsWith("--"),
-          `${flag} not followed by a value token: ${JSON.stringify(argv)}`,
-        );
-      }
-    }
-  }
+// ideate-core#152 review round 3, finding 2: the test above alone passes
+// VACUOUSLY against the -p-gets-eaten regression (finding 1) — with no
+// `options.args`, every call walks the DEFAULT_ARGS path where `-p`/
+// `--output-format` are already present, so `ensureRequiredFlags` never has
+// anything to add and its call site (before vs. after the per-agent
+// strip/append) cannot matter. Mutation-checked: gutting `ensureRequiredFlags`
+// to `return args` leaves the default-args test above passing. This second
+// run forces every request through a caller-supplied `args` that has NEITHER
+// required flag AND already occupies the `--model` slot the per-agent
+// forwarding will strip and rebuild — the exact path that had the bug — so a
+// regression in `ensureRequiredFlags`'s call site, or in the function itself,
+// fails THIS test even when the default-args run above is clean.
+test("every argv the real engine drives through this adapter (caller args forcing the strip path) satisfies the CLI-invocation invariants", async () => {
+  const spawnedArgs = await driveEngineAndCollectArgv({ args: ["--model", "placeholder"] });
+  for (const argv of spawnedArgs) assertArgvInvariants(argv);
 });
 
 // ── End-to-end through ideateCore ────────────────────────────────────────────

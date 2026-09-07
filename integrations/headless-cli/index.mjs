@@ -102,7 +102,17 @@ const DEFAULT_TIMEOUT_MS = 120000;
  *  field override a caller-supplied `args` entry for the same flag without
  *  leaving a stale, conflicting entry behind — whichever of the two
  *  equally-standard CLI forms (`--model value` or `--model=value`) the
- *  caller used. */
+ *  caller used.
+ *
+ *  NOTE (ideate-core#153, noticed but not fixed): this walk is positional-
+ *  blind the same way `hasFlag` was — `stripFlagPair(["--effort","--model"],
+ *  "--model")` treats the literal string "--model" as a flag occurrence even
+ *  when it is actually `--effort`'s value, stripping it and leaving
+ *  `--effort` with no value. Only reachable via a contrived caller `args`
+ *  (a value that is itself an exact flag name) combined with `req.model` or
+ *  `req.effort` being set, so it is lower severity than ideate-core#153's
+ *  cases (a)/(b) and out of scope here — see the file's PR discussion for why this and
+ *  `hasFlag`/`hasPrintFlag` were not unified into one helper. */
 function stripFlagPair(args, flag) {
   const eqPrefix = `${flag}=`;
   const out = [];
@@ -120,9 +130,58 @@ function stripFlagPair(args, flag) {
 }
 
 /** True if `flag` appears in `args` either as a bare token or as the single-
- *  token `flag=value` form. */
+ *  token `flag=value` form. Positional-blind by design here: it is only
+ *  ever called for `--output-format` (see `ensureRequiredFlags`), where the
+ *  file header's "never overriding a value you did set" promise (an
+ *  explicit `--output-format text` caller choice, ideate-core#152 finding 1)
+ *  means a false positive (treating a stray value token as the flag) is the
+ *  SAFE direction to err in — it just leaves the caller's args untouched.
+ *  Do not reuse this for `-p`/`--print`; see `hasPrintFlag` below, which
+ *  needs the opposite bias. */
 function hasFlag(args, flag) {
   return args.some((a) => a === flag || (typeof a === "string" && a.startsWith(`${flag}=`)));
+}
+
+/** The two spellings of the CLI's print flag (`claude --help`: "-p, --print
+ *  Print response and exit"). Boolean flag — no `=value` form exists for it,
+ *  so unlike `hasFlag` there is no `flag=value` case to check. */
+const PRINT_FLAG_NAMES = ["-p", "--print"];
+
+/**
+ * True if `-p`/`--print` is genuinely present as a flag occurrence in
+ * `args` — not merely sitting in the *value* position of some other flag
+ * (ideate-core#153, finding a). Empirically, `args: ["--append-system-prompt",
+ * "-p"]` is real caller input: `--append-system-prompt` takes a value, and a
+ * caller's literal `-p` string there is that value, not a print flag.
+ * `hasFlag`'s old blanket `.some()` counted it as one anyway, which made
+ * `ensureRequiredFlags` skip injecting a REAL print flag — the CLI then ran
+ * interactively, emitted prose, and `defaultExtractText`'s fallback silently
+ * returned `{ok:true, text:"<prose>"}` (same terminus as the ideate-core#152
+ * defect).
+ *
+ * A token counts as a print-flag occurrence only when it matches one of
+ * `PRINT_FLAG_NAMES` AND it is at index 0, or the token immediately before
+ * it does not itself look like a flag (start with `-`). This is
+ * deliberately biased toward UNDER-counting: the cost of a false negative
+ * here is a harmless duplicate `-p`/`--print` in the final argv — verified
+ * empirically (`claude --print --print --version` parsed cleanly, exit 0,
+ * version printed; no prompt-bearing invocation was run, zero model spend)
+ * — while the cost of a false positive is the silent prose-fallback above.
+ * That asymmetry is also why this is a separate function from `hasFlag`
+ * rather than one "value-aware" helper with a policy switch: the two flags
+ * need opposite biases, and `stripFlagPair` needs a third, exact-positional
+ * behavior again (see its NOTE) — three policies in one helper was judged
+ * not worth the indirection for two call sites.
+ */
+function hasPrintFlag(args) {
+  for (let i = 0; i < args.length; i++) {
+    const token = args[i];
+    if (typeof token !== "string" || !PRINT_FLAG_NAMES.includes(token)) continue;
+    const prev = i > 0 ? args[i - 1] : undefined;
+    const looksLikeValueOfPrecedingFlag = typeof prev === "string" && prev.startsWith("-");
+    if (!looksLikeValueOfPrecedingFlag) return true;
+  }
+  return false;
 }
 
 /**
@@ -133,7 +192,7 @@ function hasFlag(args, flag) {
  */
 function ensureRequiredFlags(args) {
   let out = args;
-  if (!hasFlag(out, "-p")) out = [...out, "-p"];
+  if (!hasPrintFlag(out)) out = [...out, "-p"];
   if (!hasFlag(out, "--output-format")) out = [...out, "--output-format", "json"];
   return out;
 }

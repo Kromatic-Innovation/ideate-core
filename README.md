@@ -42,6 +42,30 @@ Turns a domain context into a pool of idea candidates by running a panel of **in
 - **Evaluate→regenerate feedback loop** (opt-in, `ideate-core/feedback`) — a Delphi-style controlled-feedback loop (Dalkey & Helmer 1963): an **injected external evaluator** (`panelist` is the intended first one) critiques the pool, and only the flagged ideas are **targeted-regenerated** against their specific `dealKillers`/`keepReasons`; `keep` passes, `kill` drops, `revise` regenerates, then the pool re-dedupes. The evaluator model must differ from the generators (self-preference bias — Wataoka et al. 2024). The feedback-in contract itself is **provider-agnostic**; see `exampleAdapterFromPanelist` in `lib/feedback.mjs` for a worked example of adapting one evaluator's output shape onto it — the adapter is illustrative, not a required or canonical format.
 - **Global dedup**, provider-agnostic injectable client + embedder (tests stay offline), zero domain code.
 
+### Total failure is distinguishable from an empty pool
+
+A per-agent `complete()` call that throws or returns a bad reply is dropped, not
+fatal — one bad model reply must never sink the run. But if it dropped
+*silently*, a caller couldn't tell "the models produced no ideas" from "nothing
+ran at all." `ideateCore` never throws on this; instead it makes the failure
+observable on the return value, with no preflight required:
+
+- `meta.agentsAttempted` / `meta.agentsFailed` — round-1 panel size and how many
+  of those calls failed (threw, returned a bad reply, or had no resolvable
+  client). `agentsFailed === agentsAttempted` with an empty `candidates` array
+  means every round-1 agent failed — the pool is empty *because of that*, not
+  because the models had no ideas.
+- `meta.agentErrors` — the reason behind each failure, `{agentId, round,
+  message}`, recorded **by default across every round** (round 1 and any
+  build-on round), whether or not you pass `deps.onAgentError`. Note the scope
+  difference: `agentsFailed` counts round-1 nulls only, while `agentErrors`
+  spans all rounds — `agentErrors.filter(e => e.round === 1).length ===
+  agentsFailed` always holds.
+- `deps.onAgentError(err, {agentId, round})` — an optional callback fired
+  once per failure (same rounds as `agentErrors`) if you want to react to a
+  failure as it happens rather than inspecting `meta` afterward; it runs
+  alongside the default recording, not instead of it.
+
 ## Install
 
 ```bash

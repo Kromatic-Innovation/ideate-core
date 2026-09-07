@@ -34,6 +34,23 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
   and partial-failure behavior (one bad agent still dropped, not fatal) are
   unchanged. Purely additive; no existing field's shape or meaning changes.
 
+  `agentErrors` covers **every round** (round 1 and any build-on round),
+  while `agentsFailed` (ideate-core#90) is round-1 only. The invariant: the
+  count of `agentErrors` entries with `round === 1` always equals
+  `agentsFailed`. Both `lib/ideate-core.mjs`'s meta comment and the JSDoc
+  now state that scope difference explicitly. Round-2 has the same two
+  failure paths round 1 always had: a thrown/bad-reply `complete()` call, and
+  no client resolvable for that round's agent (e.g. a caller's
+  `deps.resolveClient` going stateful between rounds) — both are now recorded
+  and reported for round 2 exactly as they already were for round 1, closing
+  a silent-drop path a caller-supplied `resolveClient` could otherwise hit
+  invisibly. A non-Error throw (a plain string, a plain object, `null`, …
+  from a caller's `complete` or an SDK underneath it) no longer collapses to
+  an empty or absent `message` — it's rendered via `.message` when present,
+  else `JSON.stringify` for a plain object, else `String()`. Documented as
+  the total-failure signal in `README.md` (`meta.agentsAttempted` /
+  `agentsFailed` / `agentErrors` / `deps.onAgentError`).
+
 - **Per-agent `effort` pass-through (ideate-core#146).** An agent spec passed to
   `deps.agents` may now set `effort`; `resolveAgents` forwards it (optional, no
   default — absent stays distinguishable from an explicit value) and it is

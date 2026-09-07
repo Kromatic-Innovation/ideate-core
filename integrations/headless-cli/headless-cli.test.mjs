@@ -142,6 +142,170 @@ test("complete() does not forward temperature or maxTokens (no CLI flag exists)"
   assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json"]);
 });
 
+// ── Required-flag invariant (ideate-core#152 review, finding 1) ────────────
+// `-p`/`--output-format` must survive ANY caller-supplied `options.args`, not
+// just the ones every prior test happened to include already. A miss here
+// means the real CLI emits prose that `defaultExtractText`'s non-JSON
+// fallback returns as `{ok:true, text:"<prose>"}` — no throw, a silently
+// junk candidate pool.
+test("caller args missing --output-format entirely still get it defaulted to json", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({ spawn, args: ["--model", "haiku"] });
+  await complete({ prompt: "x" });
+  assert.deepEqual(spawn.calls[0].args, ["--model", "haiku", "-p", "--output-format", "json"]);
+});
+
+test("caller args missing -p entirely still get it added", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({ spawn, args: ["--output-format", "json"] });
+  await complete({ prompt: "x" });
+  assert.deepEqual(spawn.calls[0].args, ["--output-format", "json", "-p"]);
+});
+
+test("a caller's explicit --output-format text is honored, not overridden to json", async () => {
+  const spawn = makeFakeSpawn({ stdout: "plain text reply", code: 0 });
+  const complete = createHeadlessCliComplete({ spawn, args: ["-p", "--output-format", "text"] });
+  const res = await complete({ prompt: "x" });
+  assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "text"]);
+  assert.deepEqual(res, { ok: true, text: "plain text reply" });
+});
+
+test("a caller's explicit --output-format=text (single-token form) is honored", async () => {
+  const spawn = makeFakeSpawn({ stdout: "plain text reply", code: 0 });
+  const complete = createHeadlessCliComplete({ spawn, args: ["-p", "--output-format=text"] });
+  await complete({ prompt: "x" });
+  assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format=text"]);
+});
+
+// ── Bare-flag / garbage-value invariant hardening ───────────────────────────
+test("complete() throws when req.model is a non-string (garbage, not forwarded as-is)", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({ spawn });
+  await assert.rejects(
+    complete({ prompt: "x", model: true }),
+    (e) => e instanceof HeadlessCliError && /must be a string/.test(e.message),
+  );
+  assert.equal(spawn.calls.length, 0, "must throw before ever spawning the CLI");
+});
+
+test("complete() throws when req.effort is a non-string object", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({ spawn });
+  await assert.rejects(
+    complete({ prompt: "x", effort: {} }),
+    (e) => e instanceof HeadlessCliError && /must be a string/.test(e.message),
+  );
+});
+
+test("complete() throws when req.model looks like a flag, instead of letting it swallow --effort", async () => {
+  // Regression for the bare-flag hazard: req.model === "--effort" would
+  // otherwise emit `--model --effort <value>`, and the real --effort push
+  // would then be stripped-and-reappended against the wrong occurrence.
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({ spawn });
+  await assert.rejects(
+    complete({ prompt: "x", model: "--effort", effort: "high" }),
+    (e) => e instanceof HeadlessCliError && /looks like a flag/.test(e.message),
+  );
+  assert.equal(spawn.calls.length, 0);
+});
+
+test("complete() throws when req.effort looks like a flag", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({ spawn });
+  await assert.rejects(
+    complete({ prompt: "x", effort: "-x" }),
+    (e) => e instanceof HeadlessCliError && /looks like a flag/.test(e.message),
+  );
+});
+
+// ── stripFlagPair near-miss pinning (ideate-core#152 review, finding 3) ─────
+// These lock down that only an EXACT flag match (or its `=value` form) is
+// ever stripped — a prefix/suffix near-miss must survive untouched.
+test("a --models near-miss is preserved when overriding --model", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({
+    spawn,
+    args: ["-p", "--output-format", "json", "--models", "keep-me"],
+  });
+  await complete({ prompt: "x", model: "opus" });
+  assert.deepEqual(spawn.calls[0].args, [
+    "-p",
+    "--output-format",
+    "json",
+    "--models",
+    "keep-me",
+    "--model",
+    "opus",
+  ]);
+});
+
+test("a --model-set near-miss is preserved when overriding --model", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({
+    spawn,
+    args: ["-p", "--output-format", "json", "--model-set", "abc"],
+  });
+  await complete({ prompt: "x", model: "opus" });
+  assert.deepEqual(spawn.calls[0].args, [
+    "-p",
+    "--output-format",
+    "json",
+    "--model-set",
+    "abc",
+    "--model",
+    "opus",
+  ]);
+});
+
+test("an --effortless near-miss is preserved when overriding --effort", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({
+    spawn,
+    args: ["-p", "--output-format", "json", "--effortless", "true"],
+  });
+  await complete({ prompt: "x", effort: "high" });
+  assert.deepEqual(spawn.calls[0].args, [
+    "-p",
+    "--output-format",
+    "json",
+    "--effortless",
+    "true",
+    "--effort",
+    "high",
+  ]);
+});
+
+test("a trailing bare --model with no value is stripped safely (no crash, no stray token)", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({
+    spawn,
+    args: ["-p", "--output-format", "json", "--model"],
+  });
+  await complete({ prompt: "x", model: "opus" });
+  assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--model", "opus"]);
+});
+
+test("repeated --model occurrences in caller args all collapse to the one forwarded pair", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({
+    spawn,
+    args: ["-p", "--model", "foo", "--output-format", "json", "--model", "bar"],
+  });
+  await complete({ prompt: "x", model: "baz" });
+  assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--model", "baz"]);
+});
+
+test("a --model= with an empty value is stripped by the single-token form", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({
+    spawn,
+    args: ["-p", "--output-format", "json", "--model="],
+  });
+  await complete({ prompt: "x", model: "opus" });
+  assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--model", "opus"]);
+});
+
 // ── Caller-supplied `options.args` vs. per-agent routing fields ─────────────
 // Decision (recorded in the PR body): the per-agent request field WINS. A
 // caller-supplied `--model`/`--effort` already present in `options.args` is
@@ -268,6 +432,82 @@ test("runProcess resolves a spawnError envelope on synchronous spawn throw", asy
   const env = await runProcess({ command: "claude", spawn });
   assert.equal(env.spawnError.code, "ENOENT");
   assert.equal(env.code, null);
+});
+
+// ── Argv invariant, driven through the real engine ──────────────────────────
+// ideate-core#152 review, finding 2: this is deliberately NOT a port of
+// subagent-dispatch.test.mjs's "forwards every routing field the engine
+// sends" drift-pin test. That test earns its keep because `defaultMapRequest`
+// forwards an arbitrary object to a host that accepts arbitrary keys, so
+// "everything the engine sends must round-trip" is a real correctness
+// property there. This adapter maps onto a FIXED, two-flag CLI surface where
+// the correct default for any field without a flag is to DROP it — a future
+// engine field with no CLI equivalent is correctly absent from the argv, not
+// a bug. Porting the pattern here would mean hand-listing every field this
+// adapter does NOT forward (already `persona`, `strategy`, `ideasPerAgent`,
+// `temperature`, `maxTokens`, `round`) against the two it does — a seven-item
+// exclusion set babysitting a two-item forward set, which is exactly the
+// "second hand-copied list that drifts in lockstep and catches nothing" that
+// subagent-dispatch.test.mjs itself warns against (see its lines ~196-199).
+//
+// What IS specific to this adapter, and worth pinning, is the shape of the
+// argv it hands the CLI — drive the real engine through a fake spawn and
+// assert every single emitted argv satisfies the CLI-invocation invariants.
+test("every argv the real engine drives through this adapter satisfies the CLI-invocation invariants", async () => {
+  const spawnedArgs = [];
+  const spawn = makeFakeSpawn({
+    stdout: JSON.stringify({ is_error: false, result: '[{"text":"idea"}]' }),
+    code: 0,
+  });
+  const recordingSpawn = (...args) => {
+    spawnedArgs.push(args[1]); // args[1] is the argv array `spawn(command, args, opts)`
+    return spawn(...args);
+  };
+  const complete = createHeadlessCliComplete({ spawn: recordingSpawn });
+
+  await ideateCore(
+    { context: { brief: "ways to promote a product launch" } },
+    {
+      complete,
+      buildRound1Prompt: ({ persona }) => `As ${persona}, reply JSON [{"text":"…"}].`,
+      buildRound2Prompt: ({ persona }) => `As ${persona}, extend the pool as JSON [{"text":"…"}].`,
+      maxRounds: 2,
+      agents: [
+        { persona: "pragmatist", model: "opus", effort: "low" },
+        { persona: "contrarian", model: "sonnet", effort: "xhigh" },
+        { persona: "skeptic" }, // no model/effort — absent-stays-absent case, in the mix
+      ],
+    },
+  );
+
+  assert.ok(spawnedArgs.length >= 3, "expected multiple real engine-driven CLI invocations");
+
+  for (const argv of spawnedArgs) {
+    assert.ok(argv.includes("-p"), `argv missing -p: ${JSON.stringify(argv)}`);
+    const ofIdx = argv.indexOf("--output-format");
+    assert.ok(ofIdx !== -1, `argv missing --output-format: ${JSON.stringify(argv)}`);
+    assert.equal(
+      argv[ofIdx + 1],
+      "json",
+      `--output-format not immediately followed by json: ${JSON.stringify(argv)}`,
+    );
+
+    for (const flag of ["--model", "--effort"]) {
+      const occurrences = argv.filter((a) => a === flag).length;
+      assert.ok(
+        occurrences <= 1,
+        `argv has ${occurrences} occurrences of ${flag}: ${JSON.stringify(argv)}`,
+      );
+      const idx = argv.indexOf(flag);
+      if (idx !== -1) {
+        const value = argv[idx + 1];
+        assert.ok(
+          typeof value === "string" && !value.startsWith("--"),
+          `${flag} not followed by a value token: ${JSON.stringify(argv)}`,
+        );
+      }
+    }
+  }
 });
 
 // ── End-to-end through ideateCore ────────────────────────────────────────────

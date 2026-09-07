@@ -49,7 +49,23 @@
 // entire point of a panel; a caller who wants a single fixed model for every
 // agent should leave it off the per-agent request instead of baking it into
 // `args`. If the request field is absent, the caller's `args` are left
-// completely untouched.
+// completely untouched. A forwarded value must be a plain string that does
+// not itself look like a flag (does not start with `-`) — anything else is a
+// loud throw, never forwarded, so a routing value can never swallow or
+// duplicate an adjacent flag.
+//
+// `options.args`'s "replace DEFAULT_ARGS" semantics has ONE guaranteed
+// exception (ideate-core#152 review, finding 1): `-p` and `--output-format`
+// are always present in the final argv, added — never overriding a value
+// already there — only when a caller's `args` omits them entirely. Without
+// this, a caller `args` missing `--output-format json` produced non-JSON
+// prose on stdout that `defaultExtractText` tolerates as a fallback and
+// returns as `{ok:true, text:"<prose>"}` with no throw anywhere — exactly the
+// silent-empty/junk-pool hazard this adapter exists to prevent, on a path no
+// existing test exercised (every prior caller-`args` test happened to include
+// both flags already). A caller supplying its own `extractText` and wanting
+// `--output-format text` keeps that choice: this only adds a flag that is
+// completely missing, never touches one the caller already set.
 //
 // ── The silent-empty-pool hazard (important) ────────────────────────────────
 // ideate-core's engine wraps every per-agent `complete()` call in a try/catch
@@ -101,6 +117,45 @@ function stripFlagPair(args, flag) {
     out.push(args[i]);
   }
   return out;
+}
+
+/** True if `flag` appears in `args` either as a bare token or as the single-
+ *  token `flag=value` form. */
+function hasFlag(args, flag) {
+  return args.some((a) => a === flag || (typeof a === "string" && a.startsWith(`${flag}=`)));
+}
+
+/**
+ * Guarantee `-p` and `--output-format` are present in the final argv, WITHOUT
+ * overriding a value the caller already supplied — see the file header
+ * ("ideate-core#152 review, finding 1") for why this exists. Only ever ADDS a
+ * flag that is entirely missing from `args`; never touches one already there.
+ */
+function ensureRequiredFlags(args) {
+  let out = args;
+  if (!hasFlag(out, "-p")) out = [...out, "-p"];
+  if (!hasFlag(out, "--output-format")) out = [...out, "--output-format", "json"];
+  return out;
+}
+
+/**
+ * Validate a routing field's value before it is forwarded as a CLI flag
+ * argument. Throws HeadlessCliError (never silently coerces or drops) when
+ * the value is not a plain string, or when it looks like a flag itself
+ * (starts with `-`) — the latter would otherwise let the value swallow or
+ * duplicate an adjacent flag in the argv (ideate-core#152 review, finding 4).
+ */
+function assertForwardableRoutingValue(fieldName, flag, value) {
+  if (typeof value !== "string") {
+    throw new HeadlessCliError(
+      `headless-cli adapter: req.${fieldName} must be a string to forward as ${flag} — got ${typeof value}. Refusing to forward a non-string value to the CLI.`,
+    );
+  }
+  if (value.startsWith("-")) {
+    throw new HeadlessCliError(
+      `headless-cli adapter: req.${fieldName} value ${JSON.stringify(value)} looks like a flag, not a value — refusing to forward it as ${flag}'s argument.`,
+    );
+  }
 }
 
 function truncate(s, max = 500) {
@@ -232,6 +287,9 @@ export function defaultExtractText(stdout) {
  * @param {object} [options]
  *   @param {string}   [options.command="claude"]  the executable to run.
  *   @param {string[]} [options.args]  args passed to it (default: headless JSON print).
+ *     Overrides the default array, but `-p` and `--output-format` are always
+ *     guaranteed present — added only if your array omits them entirely,
+ *     never overriding a value you did set (see file header, finding 1).
  *   @param {function} [options.spawn]  child_process.spawn shim (INJECT for tests).
  *   @param {number}   [options.timeoutMs=120000]  hard kill after this long.
  *   @param {string}   [options.cwd]  working directory for the CLI.
@@ -245,7 +303,7 @@ export function defaultExtractText(stdout) {
  */
 export function createHeadlessCliComplete(options = {}) {
   const command = options.command || DEFAULT_COMMAND;
-  const baseArgs = Array.isArray(options.args) ? options.args : DEFAULT_ARGS;
+  const baseArgs = ensureRequiredFlags(Array.isArray(options.args) ? options.args : DEFAULT_ARGS);
   const spawn = typeof options.spawn === "function" ? options.spawn : realSpawn;
   const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : DEFAULT_TIMEOUT_MS;
   const cwd = options.cwd;
@@ -264,12 +322,14 @@ export function createHeadlessCliComplete(options = {}) {
     // Absent stays absent — never synthesize a default or a bare flag.
     let callArgs = baseArgs;
     if (req.model) {
+      assertForwardableRoutingValue("model", "--model", req.model);
       callArgs = stripFlagPair(callArgs, "--model");
-      callArgs = [...callArgs, "--model", String(req.model)];
+      callArgs = [...callArgs, "--model", req.model];
     }
     if (req.effort) {
+      assertForwardableRoutingValue("effort", "--effort", req.effort);
       callArgs = stripFlagPair(callArgs, "--effort");
-      callArgs = [...callArgs, "--effort", String(req.effort)];
+      callArgs = [...callArgs, "--effort", req.effort];
     }
 
     const { stdout, stderr, code, signal, spawnError, timedOut } = await runProcess({

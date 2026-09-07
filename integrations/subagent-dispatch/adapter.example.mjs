@@ -11,9 +11,9 @@
 //
 // `./my-dispatch.mjs` must `export const dispatch = async (task) => "…text…"`
 // (or `{ text }` / `{ result }` / `{ output }`), where `task` is one persona's
-// { prompt, persona, strategy, model, temperature, ideasPerAgent }. That is the
-// one function that hands a persona prompt to your runtime's Task/subagent
-// primitive and returns its reply.
+// { prompt, persona, strategy, model, temperature, ideasPerAgent, effort }.
+// That is the one function that hands a persona prompt to your runtime's
+// Task/subagent primitive and returns its reply.
 //
 // This module exports `deps = { complete, buildRound1Prompt }`. On import it
 // runs `assertSubagentDispatchAvailable()` so a missing/unwired dispatch is a

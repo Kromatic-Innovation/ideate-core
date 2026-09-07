@@ -275,7 +275,7 @@ test("defaultMapRequest forwards every routing field the engine actually sends, 
       if (NOT_ROUTING_FIELDS.has(key)) continue;
       assert.ok(
         Object.prototype.hasOwnProperty.call(mapped, key),
-        `defaultMapRequest dropped engine request field "${key}" — the engine sends it but the adapter's allowlist doesn't forward it`,
+        `defaultMapRequest dropped engine request field "${key}" — the engine sends it but the adapter's allowlist doesn't forward it. If this is a routing field, add it to defaultMapRequest's return; if it's a transport/library-internal field (like maxTokens), add it to NOT_ROUTING_FIELDS above instead of forwarding it to the host's dispatch primitive.`,
       );
       assert.equal(
         mapped[key],
@@ -284,9 +284,16 @@ test("defaultMapRequest forwards every routing field the engine actually sends, 
       );
     }
 
-    // Reverse direction: the adapter shouldn't fabricate/forward a value the
-    // engine never sent (catches the adapter's field list going stale in the
-    // other direction — forwarding something the engine stopped producing).
+    // Reverse direction: every mapped field must trace back to a value the
+    // engine actually set on `req` (not a value defaultMapRequest invented).
+    // Every key here is read as `req.X`, so an engine field that's merely
+    // absent is already `undefined` and skipped below — this loop doesn't
+    // catch "the engine stopped sending a field the adapter still lists"
+    // (the forward loop above only iterates keys present on `req`, so it
+    // can't catch that either; nothing in this test does). What this DOES
+    // catch: defaultMapRequest injecting a computed value the engine never
+    // provided, e.g. `effort: req.effort ?? "medium"` — a default baked into
+    // the adapter that the engine's request shape doesn't actually justify.
     for (const key of Object.keys(mapped)) {
       if (mapped[key] === undefined) continue;
       assert.ok(

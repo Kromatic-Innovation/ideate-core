@@ -45,6 +45,8 @@ hints you may ignore:
 | `persona`       | the agent's persona (round 1 differentiates by persona)       |
 | `strategy`      | the agent's generation strategy, if set                       |
 | `ideasPerAgent` | how many ideas this agent was asked for                       |
+| `effort`        | the agent's reasoning-effort override, if set (no default — absent, not a fixed value, when the agent spec didn't set one) |
+| `round`         | which build-on round this request is for — present from round 2 onward only; absent (not `1`) on round-1 requests |
 
 ### The return value
 

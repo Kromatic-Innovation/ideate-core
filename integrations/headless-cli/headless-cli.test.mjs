@@ -177,6 +177,68 @@ test("a caller's explicit --output-format=text (single-token form) is honored", 
   assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format=text"]);
 });
 
+// ── hasFlag positional/alias blindness (ideate-core#153) ───────────────────
+// A literal "-p" sitting in another flag's *value* position must not be
+// mistaken for a real print flag, and "--print" must be recognized as the
+// same flag as "-p" so it isn't duplicated. Both assertions count print-flag
+// TOKENS rather than using `.includes("-p")` — an `includes` check would
+// pass vacuously here since a stray "-p" is already present in the args
+// before injection even runs (case a), or since a lone injected "-p" would
+// also make a naive `includes` true even if duplicated (case b).
+test("a flag-shaped value token does not defeat print-flag injection (ideate-core#153, finding a)", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({
+    spawn,
+    args: ["--append-system-prompt", "-p"],
+  });
+  await complete({ prompt: "x" });
+  const argv = spawn.calls[0].args;
+  const printTokenCount = argv.filter((t) => t === "-p" || t === "--print").length;
+  // One real print flag must be injected in addition to the caller's
+  // pre-existing literal "-p" (which is --append-system-prompt's value, not
+  // a flag occurrence) — so the count must be 2, not 1.
+  assert.equal(
+    printTokenCount,
+    2,
+    `expected the caller's literal "-p" value plus one injected real print flag: ${JSON.stringify(argv)}`,
+  );
+  assert.ok(argv.includes("--output-format"), `--output-format missing: ${JSON.stringify(argv)}`);
+});
+
+test("--print is recognized as an alias of -p, so no duplicate is injected (ideate-core#153, finding b)", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({
+    spawn,
+    args: ["--print", "--output-format", "json"],
+  });
+  await complete({ prompt: "x" });
+  const argv = spawn.calls[0].args;
+  const printTokenCount = argv.filter((t) => t === "-p" || t === "--print").length;
+  assert.equal(printTokenCount, 1, `expected no duplicate print flag: ${JSON.stringify(argv)}`);
+  assert.deepEqual(argv, ["--print", "--output-format", "json"]);
+});
+
+// `hasPrintFlag`'s value-position conservatism (finding a's fix) has a known,
+// accepted false-negative: a REAL boolean flag other than `-p`/`--print`
+// (e.g. `--verbose`, confirmed via `claude --help`) immediately before a
+// genuine `-p` makes `hasPrintFlag` treat that `-p` as if it were
+// `--verbose`'s value and under-count it, injecting a harmless duplicate
+// that the code before ideate-core#153 would not have added. This is the one behavioral
+// regression this fix introduces — proven harmless at the CLI-parser level
+// (see the `hasPrintFlag` doc comment), but pinning the EXACT argv here so a
+// future change to `hasPrintFlag` cannot silently alter this without a test
+// noticing.
+test("a real boolean flag before a genuine -p causes an accepted, harmless duplicate (ideate-core#153 regression surface)", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({
+    spawn,
+    args: ["--verbose", "-p"],
+  });
+  await complete({ prompt: "x" });
+  const argv = spawn.calls[0].args;
+  assert.deepEqual(argv, ["--verbose", "-p", "-p", "--output-format", "json"]);
+});
+
 // ── Bare-flag / garbage-value invariant hardening ───────────────────────────
 test("complete() throws when req.model is a non-string (garbage, not forwarded as-is)", async () => {
   const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });

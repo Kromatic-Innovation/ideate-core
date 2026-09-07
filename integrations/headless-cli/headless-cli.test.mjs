@@ -218,6 +218,27 @@ test("--print is recognized as an alias of -p, so no duplicate is injected (idea
   assert.deepEqual(argv, ["--print", "--output-format", "json"]);
 });
 
+// `hasPrintFlag`'s value-position conservatism (finding a's fix) has a known,
+// accepted false-negative: a REAL boolean flag other than `-p`/`--print`
+// (e.g. `--verbose`, confirmed via `claude --help`) immediately before a
+// genuine `-p` makes `hasPrintFlag` treat that `-p` as if it were
+// `--verbose`'s value and under-count it, injecting a harmless duplicate
+// that the code before ideate-core#153 would not have added. This is the one behavioral
+// regression this fix introduces — proven harmless at the CLI-parser level
+// (see the `hasPrintFlag` doc comment), but pinning the EXACT argv here so a
+// future change to `hasPrintFlag` cannot silently alter this without a test
+// noticing.
+test("a real boolean flag before a genuine -p causes an accepted, harmless duplicate (ideate-core#153 regression surface)", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({
+    spawn,
+    args: ["--verbose", "-p"],
+  });
+  await complete({ prompt: "x" });
+  const argv = spawn.calls[0].args;
+  assert.deepEqual(argv, ["--verbose", "-p", "-p", "--output-format", "json"]);
+});
+
 // ── Bare-flag / garbage-value invariant hardening ───────────────────────────
 test("complete() throws when req.model is a non-string (garbage, not forwarded as-is)", async () => {
   const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });

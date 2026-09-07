@@ -106,12 +106,22 @@ const DEFAULT_TIMEOUT_MS = 120000;
  *
  *  NOTE (ideate-core#153, noticed but not fixed): this walk is positional-
  *  blind the same way `hasFlag` was — `stripFlagPair(["--effort","--model"],
- *  "--model")` treats the literal string "--model" as a flag occurrence even
- *  when it is actually `--effort`'s value, stripping it and leaving
- *  `--effort` with no value. Only reachable via a contrived caller `args`
- *  (a value that is itself an exact flag name) combined with `req.model` or
- *  `req.effort` being set, so it is lower severity than ideate-core#153's
- *  cases (a)/(b) and out of scope here — see the file's PR discussion for why this and
+ *  "--model")` treats the literal string "--model" (actually `--effort`'s
+ *  value) as a flag occurrence and strips it. This is worse than a dropped
+ *  value: `--model`'s own consumed-value logic then eats the NEXT token as
+ *  if it belonged to the (removed) "--model" occurrence, so with
+ *  `req.model="opus"` set, `["--effort","--model"]` becomes
+ *  `["--effort","--model","opus","-p","--output-format","json"]` — `opus`
+ *  survives as a stray trailing positional argument, which on a `-p` run
+ *  can be read as (or concatenated into) the prompt, ahead of the real one
+ *  fed on stdin. That is a silent-wrong-output path, not a cosmetically odd
+ *  one. `assertForwardableRoutingValue` blocks a flag-shaped value from the
+ *  per-agent *request* (`req.model`/`req.effort`), but has no visibility
+ *  into caller-supplied `args` — which is exactly why this gap exists here
+ *  and not there. Only reachable via a contrived caller `args` (a value that
+ *  is itself an exact flag name) combined with `req.model`/`req.effort`
+ *  being set, so it is lower severity than ideate-core#153's cases (a)/(b)
+ *  and out of scope here — see the file's PR discussion for why this and
  *  `hasFlag`/`hasPrintFlag` were not unified into one helper. */
 function stripFlagPair(args, flag) {
   const eqPrefix = `${flag}=`;
@@ -163,10 +173,19 @@ const PRINT_FLAG_NAMES = ["-p", "--print"];
  * `PRINT_FLAG_NAMES` AND it is at index 0, or the token immediately before
  * it does not itself look like a flag (start with `-`). This is
  * deliberately biased toward UNDER-counting: the cost of a false negative
- * here is a harmless duplicate `-p`/`--print` in the final argv — verified
- * empirically (`claude --print --print --version` parsed cleanly, exit 0,
- * version printed; no prompt-bearing invocation was run, zero model spend)
- * — while the cost of a false positive is the silent prose-fallback above.
+ * here is a harmless duplicate `-p`/`--print` in the final argv. Verified
+ * empirically WITHOUT spawning a real completion: `claude --print --print
+ * --definitely-not-a-flag` and `claude -p -p --definitely-not-a-flag` both
+ * fail with `error: unknown option '--definitely-not-a-flag'` — i.e. the
+ * parser accepted both repeated print tokens and only then choked on the
+ * bogus one, rather than erroring on the duplicate itself. (An earlier
+ * version of this note cited `claude --print --print --version`, exit 0 —
+ * a weaker probe, since `--version` can short-circuit during parsing before
+ * any duplicate-option validation would run; the `--definitely-not-a-flag`
+ * probe forces parsing to continue past both `--print` tokens first, so it
+ * actually demonstrates what this comment claims.) No prompt-bearing
+ * invocation was run either way, zero model spend. The cost of a false
+ * positive, in contrast, is the silent prose-fallback above.
  * That asymmetry is also why this is a separate function from `hasFlag`
  * rather than one "value-aware" helper with a policy switch: the two flags
  * need opposite biases, and `stripFlagPair` needs a third, exact-positional

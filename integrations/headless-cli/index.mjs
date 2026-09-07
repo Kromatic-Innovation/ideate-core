@@ -41,14 +41,15 @@
 // emits a bare flag with no value.
 //
 // Caller-supplied `options.args` vs. these per-agent fields: when a caller's
-// own `args` already contains `--model`/`--effort` AND the request carries
-// that same field, the PER-AGENT REQUEST FIELD WINS — it is stripped out of
-// the caller's base args (flag + its value, so no leftover pair) and
-// re-appended with the request's value. Rationale: distinguishing routing per
-// agent is the entire point of a panel; a caller who wants a single fixed
-// model for every agent should leave it off the per-agent request instead of
-// baking it into `args`. If the request field is absent, the caller's `args`
-// are left completely untouched.
+// own `args` already contains `--model`/`--effort` (either as two elements,
+// `--model value`, or one, `--model=value`) AND the request carries that same
+// field, the PER-AGENT REQUEST FIELD WINS — the caller's entry is stripped out
+// of the base args and re-appended with the request's value in the
+// `--flag value` form. Rationale: distinguishing routing per agent is the
+// entire point of a panel; a caller who wants a single fixed model for every
+// agent should leave it off the per-agent request instead of baking it into
+// `args`. If the request field is absent, the caller's `args` are left
+// completely untouched.
 //
 // ── The silent-empty-pool hazard (important) ────────────────────────────────
 // ideate-core's engine wraps every per-agent `complete()` call in a try/catch
@@ -80,15 +81,22 @@ const DEFAULT_ARGS = ["-p", "--output-format", "json"];
 const DEFAULT_PROBE_ARGS = ["--version"];
 const DEFAULT_TIMEOUT_MS = 120000;
 
-/** Remove `flag` and the value that follows it from an args array, if present.
- *  Used to let a per-agent request field override a caller-supplied `args`
- *  entry for the same flag without leaving a stale, conflicting pair behind. */
+/** Remove `flag` (and the value that follows it) OR a single `flag=value`
+ *  element from an args array, if present. Used to let a per-agent request
+ *  field override a caller-supplied `args` entry for the same flag without
+ *  leaving a stale, conflicting entry behind — whichever of the two
+ *  equally-standard CLI forms (`--model value` or `--model=value`) the
+ *  caller used. */
 function stripFlagPair(args, flag) {
+  const eqPrefix = `${flag}=`;
   const out = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i] === flag) {
       i++; // also skip the value that follows the flag
       continue;
+    }
+    if (typeof args[i] === "string" && args[i].startsWith(eqPrefix)) {
+      continue; // `--flag=value` is a single element — no separate value token
     }
     out.push(args[i]);
   }

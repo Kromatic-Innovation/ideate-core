@@ -168,6 +168,26 @@ test("a per-agent req.effort overrides a --effort already present in caller-supp
   assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--effort", "xhigh"]);
 });
 
+test("a per-agent req.model overrides a caller-supplied --model=value (single-token) form", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({
+    spawn,
+    args: ["-p", "--output-format", "json", "--model=haiku"],
+  });
+  await complete({ prompt: "x", model: "opus" });
+  assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--model", "opus"]);
+});
+
+test("a per-agent req.effort overrides a caller-supplied --effort=value (single-token) form", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({
+    spawn,
+    args: ["-p", "--effort=low", "--output-format", "json"],
+  });
+  await complete({ prompt: "x", effort: "xhigh" });
+  assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--effort", "xhigh"]);
+});
+
 test("caller-supplied args survive untouched when the request has no model/effort", async () => {
   const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
   const customArgs = ["-p", "--output-format", "json", "--model", "haiku"];

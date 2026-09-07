@@ -29,6 +29,21 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
   map, or validate the value — that stays the injected `complete` client's job,
   same division of responsibility `strategy` already follows.
 
+- **`headless-cli` adapter forwards `model`/`effort` for routing parity
+  (ideate-core#151).** `createHeadlessCliComplete`'s `complete()` now forwards
+  a request's `model` as `--model <value>` and `effort` as `--effort <value>`
+  when present — absent stays absent, no default is synthesized and no bare
+  flag is ever emitted. The CLI's effort ladder (`low, medium, high, xhigh,
+max`) is identical to the API's `output_config.effort`, so it passes through
+  verbatim. `temperature` and `maxTokens` remain unforwarded — the CLI has no
+  flag for either, and `--max-budget-usd` is a dollar spend cap, not a token
+  cap, so it is deliberately not repurposed for `maxTokens`. When a caller's
+  own `options.args` already contains `--model`/`--effort`, the per-agent
+  request field wins: it replaces the caller's flag+value pair rather than
+  being appended alongside it, so the outcome never depends on argument-array
+  order. Documented in `skills/adapter-authoring/SKILL.md`'s request-field
+  table alongside the `subagent-dispatch` adapter's fuller forwarding.
+
 ### Fixed
 
 - **`subagent-dispatch` adapter dropped `effort` (ideate-core#149).** The

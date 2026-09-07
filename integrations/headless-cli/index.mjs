@@ -18,6 +18,38 @@
 //   - FAILS LOUDLY. A missing or unauthenticated CLI, a non-zero exit, or an
 //     unparseable reply throws a descriptive Error — never a silent empty pool.
 //
+// ── Routing parity (ideate-core#151) ────────────────────────────────────────
+// This adapter aims for routing PARITY with a metered-API adapter, not a
+// reduced feature set — the point of running on the CLI is the *credential*
+// (no second auth to manage), not fewer routing knobs. Of the engine's
+// per-agent request fields:
+//   - `model`   → forwarded as `--model <value>` (accepts the CLI's aliases —
+//                 `opus`/`sonnet`/`fable` — or a full model name).
+//   - `effort`  → forwarded as `--effort <value>`. The CLI's ladder (`low,
+//                 medium, high, xhigh, max`) is IDENTICAL to the API's
+//                 `output_config.effort`, so it passes through verbatim with
+//                 no provider-specific mapping.
+//   - `temperature`, `maxTokens` → NOT forwarded. The CLI has no flag for
+//                 either. `--max-budget-usd` exists but is a dollar SPEND cap,
+//                 not a token cap — do not map `maxTokens` onto it; that would
+//                 silently change its meaning.
+//   - `persona`, `strategy`, `ideasPerAgent` → not request-shaped for this
+//                 adapter at all; the engine's prompt builders already encode
+//                 them into the prompt text, so there is nothing to forward.
+// Both fields are OPTIONAL and independent: absent on the request means
+// absent on the CLI invocation — this adapter never synthesizes a default or
+// emits a bare flag with no value.
+//
+// Caller-supplied `options.args` vs. these per-agent fields: when a caller's
+// own `args` already contains `--model`/`--effort` AND the request carries
+// that same field, the PER-AGENT REQUEST FIELD WINS — it is stripped out of
+// the caller's base args (flag + its value, so no leftover pair) and
+// re-appended with the request's value. Rationale: distinguishing routing per
+// agent is the entire point of a panel; a caller who wants a single fixed
+// model for every agent should leave it off the per-agent request instead of
+// baking it into `args`. If the request field is absent, the caller's `args`
+// are left completely untouched.
+//
 // ── The silent-empty-pool hazard (important) ────────────────────────────────
 // ideate-core's engine wraps every per-agent `complete()` call in a try/catch
 // and DROPS an agent that throws (robustness: one bad model reply must not sink
@@ -47,6 +79,21 @@ const DEFAULT_COMMAND = "claude";
 const DEFAULT_ARGS = ["-p", "--output-format", "json"];
 const DEFAULT_PROBE_ARGS = ["--version"];
 const DEFAULT_TIMEOUT_MS = 120000;
+
+/** Remove `flag` and the value that follows it from an args array, if present.
+ *  Used to let a per-agent request field override a caller-supplied `args`
+ *  entry for the same flag without leaving a stale, conflicting pair behind. */
+function stripFlagPair(args, flag) {
+  const out = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === flag) {
+      i++; // also skip the value that follows the flag
+      continue;
+    }
+    out.push(args[i]);
+  }
+  return out;
+}
 
 function truncate(s, max = 500) {
   const str = String(s == null ? "" : s);
@@ -182,11 +229,15 @@ export function defaultExtractText(stdout) {
  *   @param {string}   [options.cwd]  working directory for the CLI.
  *   @param {object}   [options.env]  env for the CLI (defaults to process.env).
  *   @param {function} [options.extractText]  (stdout)=>string reply extractor.
- * @returns {(req:{prompt:string})=>Promise<{ok:true,text:string}>}
+ * @returns {(req:{prompt:string, model?:string, effort?:string})=>Promise<{ok:true,text:string}>}
+ *   `req.model` forwards as `--model <value>`; `req.effort` forwards as
+ *   `--effort <value>`; both override a same-named flag in `options.args`.
+ *   `req.temperature`/`req.maxTokens` are accepted (per the engine's request
+ *   shape) but not forwarded — see the file header for why.
  */
 export function createHeadlessCliComplete(options = {}) {
   const command = options.command || DEFAULT_COMMAND;
-  const args = Array.isArray(options.args) ? options.args : DEFAULT_ARGS;
+  const baseArgs = Array.isArray(options.args) ? options.args : DEFAULT_ARGS;
   const spawn = typeof options.spawn === "function" ? options.spawn : realSpawn;
   const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : DEFAULT_TIMEOUT_MS;
   const cwd = options.cwd;
@@ -200,9 +251,22 @@ export function createHeadlessCliComplete(options = {}) {
       throw new HeadlessCliError("headless-cli adapter: req.prompt (non-empty string) is required");
     }
 
+    // Per-agent routing parity (ideate-core#151): forward `model`/`effort`
+    // when present, overriding a same-named flag already in `baseArgs`.
+    // Absent stays absent — never synthesize a default or a bare flag.
+    let callArgs = baseArgs;
+    if (req.model) {
+      callArgs = stripFlagPair(callArgs, "--model");
+      callArgs = [...callArgs, "--model", String(req.model)];
+    }
+    if (req.effort) {
+      callArgs = stripFlagPair(callArgs, "--effort");
+      callArgs = [...callArgs, "--effort", String(req.effort)];
+    }
+
     const { stdout, stderr, code, signal, spawnError, timedOut } = await runProcess({
       command,
-      args,
+      args: callArgs,
       input: prompt,
       spawn,
       timeoutMs,

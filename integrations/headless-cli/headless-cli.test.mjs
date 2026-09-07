@@ -98,6 +98,84 @@ test("complete() returns { ok, text } and feeds the prompt on stdin", async () =
   assert.equal(spawn.calls[0].input, "PROMPT-BODY");
 });
 
+// ── Routing parity: model / effort forwarding ───────────────────────────────
+test("complete() forwards req.model as --model when present", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({ spawn });
+  await complete({ prompt: "x", model: "opus" });
+  assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--model", "opus"]);
+});
+
+test("complete() forwards req.effort as --effort when present", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({ spawn });
+  await complete({ prompt: "x", effort: "high" });
+  assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--effort", "high"]);
+});
+
+test("complete() forwards both --model and --effort when both are present", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({ spawn });
+  await complete({ prompt: "x", model: "sonnet", effort: "max" });
+  assert.deepEqual(spawn.calls[0].args, [
+    "-p",
+    "--output-format",
+    "json",
+    "--model",
+    "sonnet",
+    "--effort",
+    "max",
+  ]);
+});
+
+test("complete() emits no routing flags when neither model nor effort is set", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({ spawn });
+  await complete({ prompt: "x" });
+  assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json"]);
+});
+
+test("complete() does not forward temperature or maxTokens (no CLI flag exists)", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({ spawn });
+  await complete({ prompt: "x", temperature: 0.7, maxTokens: 4096 });
+  assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json"]);
+});
+
+// ── Caller-supplied `options.args` vs. per-agent routing fields ─────────────
+// Decision (recorded in the PR body): the per-agent request field WINS. A
+// caller-supplied `--model`/`--effort` already present in `options.args` is
+// stripped (flag + its value) and replaced by the request field's value, so
+// argument-array order never decides the outcome and no duplicate/conflicting
+// flag pair is ever sent.
+test("a per-agent req.model overrides a --model already present in caller-supplied args", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({
+    spawn,
+    args: ["-p", "--output-format", "json", "--model", "haiku"],
+  });
+  await complete({ prompt: "x", model: "opus" });
+  assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--model", "opus"]);
+});
+
+test("a per-agent req.effort overrides a --effort already present in caller-supplied args", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const complete = createHeadlessCliComplete({
+    spawn,
+    args: ["-p", "--effort", "low", "--output-format", "json"],
+  });
+  await complete({ prompt: "x", effort: "xhigh" });
+  assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--effort", "xhigh"]);
+});
+
+test("caller-supplied args survive untouched when the request has no model/effort", async () => {
+  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+  const customArgs = ["-p", "--output-format", "json", "--model", "haiku"];
+  const complete = createHeadlessCliComplete({ spawn, args: customArgs });
+  await complete({ prompt: "x" });
+  assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--model", "haiku"]);
+});
+
 // ── Loud failures ────────────────────────────────────────────────────────────
 test("complete() throws (not returns null) when the CLI is missing (ENOENT)", async () => {
   const spawn = makeFakeSpawn({ errorEvent: enoent() });

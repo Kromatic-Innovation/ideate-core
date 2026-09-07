@@ -91,6 +91,26 @@ max`) is identical to the API's `output_config.effort`, so it passes through
 
 ### Fixed
 
+- **headless-CLI `hasFlag` was positional- and alias-blind (ideate-core#153).**
+  `ensureRequiredFlags`'s print-flag check (`hasFlag`/`ensureRequiredFlags` in
+  `integrations/headless-cli/index.mjs`) scanned `options.args` without
+  knowing which tokens were _values_, so a caller `args` array containing the
+  literal string `-p` as some other flag's value (e.g.
+  `["--append-system-prompt", "-p"]`) satisfied the check and skipped
+  injecting a real print flag — the CLI then ran non-headless and emitted
+  prose that `defaultExtractText`'s fallback silently returned as
+  `{ok:true, text:"<prose>"}`. The same check also didn't know `--print` is
+  `-p`'s long form, so an `args` array using `--print` got a duplicate `-p`
+  appended (verified empirically to be harmless to the real CLI —
+  `claude --print --print --version` parses cleanly — but fixed anyway since
+  correct alias detection is what avoids it). A new `hasPrintFlag` counts a
+  `-p`/`--print` token as a real flag occurrence only when it isn't sitting
+  in a preceding flag's value position, biased toward the safe failure mode
+  (a harmless duplicate) rather than the unsafe one (silently skipped
+  injection). `stripFlagPair` has a lower-severity instance of the same
+  positional-blindness class (documented at its definition, not fixed here —
+  see the PR discussion for why the two weren't unified into one helper).
+
 - **`subagent-dispatch` adapter dropped `effort` (ideate-core#149).** The
   bundled `subagent-dispatch` integration's `defaultMapRequest` is an allowlist
   of forwarded request fields, so it silently dropped `effort` (ideate-core#146) — making

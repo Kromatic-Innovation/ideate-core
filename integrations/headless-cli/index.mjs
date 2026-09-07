@@ -209,14 +209,29 @@ function hasPrintFlag(args) {
 const FORWARDED_ROUTING_FLAGS = ["--model", "--effort"];
 
 /** Flags safe to be the LAST token in a caller's `args` even though
- *  something else still needs to be appended after them: `PRINT_FLAG_NAMES`
- *  take no value at all, and `FORWARDED_ROUTING_FLAGS` self-heal via the
- *  strip/append forwarding in `complete()` whenever the matching
- *  `req.model`/`req.effort` field is supplied (ideate-core#158 PR body notes
- *  the residual gap for a call that never supplies it). Any OTHER trailing
- *  flag-shaped token is unsafe to append after, because this file has no
- *  idea whether it takes a value. */
-const TRAILING_FLAG_SAFE_LIST = new Set([...PRINT_FLAG_NAMES, ...FORWARDED_ROUTING_FLAGS]);
+ *  something else still needs to be appended after them — `PRINT_FLAG_NAMES`
+ *  ONLY: `-p`/`--print` are genuinely zero-arity (confirmed via `claude
+ *  --help`), so nothing appended after them can ever be consumed as their
+ *  value.
+ *
+ *  `FORWARDED_ROUTING_FLAGS` were previously included here on the theory
+ *  that a trailing bare `--model`/`--effort` "self-heals" via the
+ *  strip/append forwarding in `complete()` — but that safety is a RUNTIME
+ *  fact (whether THIS call's `req.model`/`req.effort` happens to be set),
+ *  which a CONSTRUCTION-time check cannot observe. A call that never
+ *  supplies the matching `req` field hits the CLI's real behavior: bare
+ *  `--model` errors with "argument missing" after shifting the next token
+ *  (here, the injected `-p`) as its value, and bare `--effort` is worse —
+ *  the CLI only *warns* "Unknown --effort value '-p'" and proceeds with no
+ *  print flag, so `defaultExtractText`'s prose fallback returns
+ *  `{ok:true, text:"<prose>"}` with no throw anywhere. That is exactly the
+ *  silent-junk-pool terminus ideate-core#158 exists to close. So a trailing
+ *  bare `--model`/`--effort` is now refused like any other arity-unknown
+ *  trailing flag — a caller who always sets the matching `req` field pays a
+ *  one-element edit: drop the bare flag from `options.args` and let the
+ *  per-agent `req.model`/`req.effort` forwarding add it instead (the case
+ *  (b) throw message below already says this). */
+const TRAILING_FLAG_SAFE_LIST = new Set(PRINT_FLAG_NAMES);
 
 /** True if `token` is shaped like a flag occurrence — starts with `-` and is
  *  NOT the single-token `flag=value` form (which is self-contained and
@@ -256,28 +271,15 @@ function assertSafeBaseArgs(args) {
     );
   }
 
-  // (b) ideate-core#158: a trailing flag-shaped token this file does not
-  // know the arity of. `ensureRequiredFlags` always appends at the END of
-  // the array, so if the last token is a flag that itself takes a value,
-  // the appended -p/--output-format (or its "json" value) would be
-  // silently consumed as that flag's argument instead.
-  const last = args[args.length - 1];
-  if (looksLikeFlag(last) && !TRAILING_FLAG_SAFE_LIST.has(last)) {
-    throw new HeadlessCliError(
-      `headless-cli adapter: options.args ends with ${JSON.stringify(last)}, a flag ` +
-        "this adapter does not know the arity of — appending -p/--output-format " +
-        `after it risks being silently consumed as ${JSON.stringify(last)}'s value ` +
-        `(ideate-core#158). Give ${JSON.stringify(last)} an explicit value in ` +
-        "options.args, or move it earlier in the array so it is not last.",
-    );
-  }
-
   // (c) ideate-core#158: one of THIS adapter's own forwarded routing flags
   // followed by a flag-shaped token. `stripFlagPair` matches a flag
   // occurrence by exact string equality, positional-blind — it cannot tell
   // that token apart from a real occurrence of that flag, so removing it
   // (when the matching req field is later forwarded) desynchronizes the
-  // array and leaves the flag-shaped token as a stray positional.
+  // array and leaves the flag-shaped token as a stray positional. Checked
+  // BEFORE the case (b) trailing-token check below so this more specific
+  // diagnosis wins when a shape (like `["--effort", "--model"]`) matches
+  // both — its own trailing token is also arity-unknown-flag-shaped.
   for (let i = 0; i < args.length; i++) {
     if (FORWARDED_ROUTING_FLAGS.includes(args[i]) && looksLikeFlag(args[i + 1])) {
       throw new HeadlessCliError(
@@ -288,6 +290,31 @@ function assertSafeBaseArgs(args) {
           `req.${args[i].slice(2)} instead.`,
       );
     }
+  }
+
+  // (b) ideate-core#158: a trailing flag-shaped token this file does not
+  // know the arity of, where `ensureRequiredFlags` (always appending at the
+  // END of the array) would actually have something to append. Gated on
+  // `needsInjection`: when `-p` and `--output-format` are BOTH already
+  // present, `ensureRequiredFlags` is a no-op regardless of what the last
+  // token is, so there is nothing for this adapter to silently mis-append —
+  // whatever the caller's own trailing flag does with nothing (or a stale
+  // value) after it is a pre-existing caller-args defect the CLI itself
+  // reports loudly (a real parse error), not the silent-wrong-output class
+  // ideate-core#158 targets. When injection WOULD happen, a trailing flag
+  // this file has no arity knowledge of (beyond `PRINT_FLAG_NAMES`, which
+  // are genuinely zero-arity) risks the injected flag/value being silently
+  // consumed as that trailing flag's argument instead.
+  const needsInjection = !hasPrintFlag(args) || !hasFlag(args, "--output-format");
+  const last = args[args.length - 1];
+  if (needsInjection && looksLikeFlag(last) && !TRAILING_FLAG_SAFE_LIST.has(last)) {
+    throw new HeadlessCliError(
+      `headless-cli adapter: options.args ends with ${JSON.stringify(last)}, a flag ` +
+        "this adapter does not know the arity of — appending -p/--output-format " +
+        `after it risks being silently consumed as ${JSON.stringify(last)}'s value ` +
+        `(ideate-core#158). Give ${JSON.stringify(last)} an explicit value in ` +
+        "options.args, or move it earlier in the array so it is not last.",
+    );
   }
 }
 

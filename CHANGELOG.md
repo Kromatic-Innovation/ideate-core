@@ -94,7 +94,7 @@ max`) is identical to the API's `output_config.effort`, so it passes through
 - **headless-CLI argv construction now refuses unsafe caller `args` shapes
   instead of emitting a silently-wrong argv (ideate-core#158).** Three
   residual cases, all reachable only through caller-supplied `options.args`,
-  survived ideate-core#151/#152/#153: (a) a `--` (end-of-options marker)
+  survived ideate-core#151/ideate-core#152/ideate-core#153: (a) a `--` (end-of-options marker)
   anywhere in `args` made every injected flag a no-op positional; (b) a
   trailing flag-shaped token this adapter doesn't know the arity of (e.g.
   `["-p", "--append-system-prompt"]`) let the injected `-p`/`--output-format`
@@ -113,9 +113,15 @@ max`) is identical to the API's `output_config.effort`, so it passes through
   construction (rather than per-call) means a bad `options.args` fails
   immediately and loudly instead of surfacing as a dropped agent inside the
   engine's per-call `complete()` swallow. A trailing bare `--model`/`--effort`
-  with no value is deliberately NOT refused — it self-heals via the existing
-  per-agent `req.model`/`req.effort` forwarding — matching ideate-core#152's
-  already-tested behavior for that shape.
+  with no value IS refused too, even though it can "self-heal" via the
+  existing per-agent `req.model`/`req.effort` forwarding on a call that
+  happens to supply the matching field: that safety is a per-call runtime
+  fact a construction-time check cannot observe, and a call that omits the
+  field hits the real CLI's behavior (`--model` shifts the next token as its
+  value; `--effort` only warns and proceeds with no print flag) — the exact
+  silent-junk-pool terminus this issue exists to close. A caller who always
+  supplies the matching `req` field drops the bare flag from `options.args`
+  and lets the per-agent forwarding add it instead.
 
 - **headless-CLI `hasFlag` was positional- and alias-blind (ideate-core#153).**
   `ensureRequiredFlags`'s print-flag check (`hasFlag`/`ensureRequiredFlags` in

@@ -195,7 +195,7 @@ test("assertSubagentDispatchAvailable can actively probe the dispatch", async ()
 //
 // The allowlist in defaultMapRequest has no coupling to lib/ideate-core.mjs's
 // request shape, so it can silently drop a future pass-through field exactly
-// like it silently dropped `effort` (#149). Instead of asserting against a
+// like it silently dropped `effort` (ideate-core#149). Instead of asserting against a
 // second hand-copied field list here (which would drift in lockstep with the
 // implementation and catch nothing), this test runs the REAL engine with a
 // recording `complete` to capture what it actually puts on the request, then
@@ -225,7 +225,7 @@ test("defaultMapRequest forwards every routing field the engine actually sends, 
       // Every agent field set to a distinct, non-default value so the request
       // is maximally dense — an `undefined === undefined` comparison would
       // pass vacuously and hide a real drop, the way `effort` was hidden
-      // before #149 (it only survived as a *key* because resolveAgents always
+      // before ideate-core#149 (it only survived as a *key* because resolveAgents always
       // writes it, even unset; a conditionally-added future field would not
       // even show up as a key under a sparser agent spec).
       agents: [

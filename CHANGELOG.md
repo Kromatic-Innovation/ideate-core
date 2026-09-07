@@ -33,7 +33,7 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 - **`subagent-dispatch` adapter dropped `effort` (ideate-core#149).** The
   bundled `subagent-dispatch` integration's `defaultMapRequest` is an allowlist
-  of forwarded request fields, so it silently dropped `effort` (#146) — making
+  of forwarded request fields, so it silently dropped `effort` (ideate-core#146) — making
   the per-agent reasoning-effort feature a no-op for any caller on the
   adapter's documented default path. `defaultMapRequest` now forwards `effort`
   too, and a new test pins the default's forwarding contract against the

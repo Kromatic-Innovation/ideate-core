@@ -9,6 +9,7 @@ import {
   createSubagentDispatchComplete,
   assertSubagentDispatchAvailable,
   normalizeDispatchText,
+  defaultMapRequest,
   SubagentDispatchError,
 } from "./index.mjs";
 import { ideateCore } from "../../lib/ideate-core.mjs";
@@ -188,6 +189,119 @@ test("assertSubagentDispatchAvailable can actively probe the dispatch", async ()
       }),
     /preflight dispatch failed/,
   );
+});
+
+// ── defaultMapRequest: pin the forwarding contract against the real engine ──
+//
+// The allowlist in defaultMapRequest has no coupling to lib/ideate-core.mjs's
+// request shape, so it can silently drop a future pass-through field exactly
+// like it silently dropped `effort` (ideate-core#149). Instead of asserting against a
+// second hand-copied field list here (which would drift in lockstep with the
+// implementation and catch nothing), this test runs the REAL engine with a
+// recording `complete` to capture what it actually puts on the request, then
+// checks defaultMapRequest forwards every one of those fields unchanged. If
+// the engine grows a new pass-through field, this test starts failing the
+// moment defaultMapRequest doesn't also grow to cover it — no test edit
+// required to detect the drift, only to fix it.
+test("defaultMapRequest forwards every routing field the engine actually sends, with no hand-copied list", async () => {
+  const engineRequests = [];
+  const recordingComplete = async (req) => {
+    engineRequests.push(req);
+    return { ok: true, text: ideasReply(req) };
+  };
+
+  await ideateCore(
+    { context: { brief: "ways to promote a product launch" } },
+    {
+      complete: recordingComplete,
+      buildRound1Prompt: ({ persona }) => `As ${persona}, produce ideas as a JSON array of {text}.`,
+      // A build-on round-2 prompt so round 2 actually fires — that's the call
+      // site (lib/ideate-core.mjs ~line 313) this bug lived in, and it also
+      // adds the `round` field to the request, which the exclusion set below
+      // has to name explicitly rather than just never seeing it.
+      buildRound2Prompt: ({ persona }) =>
+        `As ${persona}, extend the pool as a JSON array of {text}.`,
+      maxRounds: 2,
+      // Every agent field set to a distinct, non-default value so the request
+      // is maximally dense — an `undefined === undefined` comparison would
+      // pass vacuously and hide a real drop, the way `effort` was hidden
+      // before ideate-core#149 (it only survived as a *key* because resolveAgents always
+      // writes it, even unset; a conditionally-added future field would not
+      // even show up as a key under a sparser agent spec).
+      agents: [
+        {
+          persona: "pragmatist",
+          strategy: "direct",
+          model: "test-model-a",
+          temperature: 0.3,
+          ideasPerAgent: 4,
+          effort: "low",
+        },
+        {
+          persona: "contrarian",
+          strategy: "cot",
+          model: "test-model-b",
+          temperature: 0.9,
+          ideasPerAgent: 5,
+          effort: "high",
+        },
+      ],
+    },
+  );
+
+  // Round 1 (2 agents) + round 2 (2 agents, pool non-empty) = 4 requests.
+  assert.ok(
+    engineRequests.length >= 3,
+    "expected both round 1 and round 2 requests to be recorded",
+  );
+  assert.ok(
+    engineRequests.some((r) => r.round === 2),
+    "expected at least one round-2 request — buildRound2Prompt should have fired",
+  );
+
+  // Deliberately NOT forwarded to a subagent dispatch: these are library-
+  // internal/transport parameters (a token budget, a round counter), not
+  // persona-routing fields a dispatch target consumes. This exclusion set is
+  // the one place a reviewer needs to touch if a future field is intentionally
+  // kept off the wire — everything else must round-trip in both directions.
+  const NOT_ROUTING_FIELDS = new Set(["maxTokens", "round"]);
+
+  for (const req of engineRequests) {
+    const mapped = defaultMapRequest(req);
+
+    // Forward direction: every routing field the engine sent must survive,
+    // unchanged, into the mapped task.
+    for (const key of Object.keys(req)) {
+      if (NOT_ROUTING_FIELDS.has(key)) continue;
+      assert.ok(
+        Object.prototype.hasOwnProperty.call(mapped, key),
+        `defaultMapRequest dropped engine request field "${key}" — the engine sends it but the adapter's allowlist doesn't forward it. If this is a routing field, add it to defaultMapRequest's return; if it's a transport/library-internal field (like maxTokens), add it to NOT_ROUTING_FIELDS above instead of forwarding it to the host's dispatch primitive.`,
+      );
+      assert.equal(
+        mapped[key],
+        req[key],
+        `defaultMapRequest changed the value of forwarded field "${key}"`,
+      );
+    }
+
+    // Reverse direction: every mapped field must trace back to a value the
+    // engine actually set on `req` (not a value defaultMapRequest invented).
+    // Every key here is read as `req.X`, so an engine field that's merely
+    // absent is already `undefined` and skipped below — this loop doesn't
+    // catch "the engine stopped sending a field the adapter still lists"
+    // (the forward loop above only iterates keys present on `req`, so it
+    // can't catch that either; nothing in this test does). What this DOES
+    // catch: defaultMapRequest injecting a computed value the engine never
+    // provided, e.g. `effort: req.effort ?? "medium"` — a default baked into
+    // the adapter that the engine's request shape doesn't actually justify.
+    for (const key of Object.keys(mapped)) {
+      if (mapped[key] === undefined) continue;
+      assert.ok(
+        Object.prototype.hasOwnProperty.call(req, key),
+        `defaultMapRequest forwarded "${key}" but the engine's request never set it`,
+      );
+    }
+  }
 });
 
 // ── End-to-end through the real engine ───────────────────────────────────────

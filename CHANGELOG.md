@@ -29,6 +29,18 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
   map, or validate the value — that stays the injected `complete` client's job,
   same division of responsibility `strategy` already follows.
 
+### Fixed
+
+- **`subagent-dispatch` adapter dropped `effort` (ideate-core#149).** The
+  bundled `subagent-dispatch` integration's `defaultMapRequest` is an allowlist
+  of forwarded request fields, so it silently dropped `effort` (ideate-core#146) — making
+  the per-agent reasoning-effort feature a no-op for any caller on the
+  adapter's documented default path. `defaultMapRequest` now forwards `effort`
+  too, and a new test pins the default's forwarding contract against the
+  engine's actual `complete` request shape (not a second hand-copied field
+  list), so a future pass-through field the engine adds will fail CI here
+  instead of silently going untransmitted.
+
 ## [0.4.0] - 2026-08-02
 
 ### Removed

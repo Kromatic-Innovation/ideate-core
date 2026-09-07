@@ -100,7 +100,7 @@ export function normalizeDispatchText(result) {
  *     once per persona agent. `task` is `mapRequest(req)` (see below).
  *   @param {function} [options.mapRequest]  (req)=>task. Shapes the object handed
  *     to `dispatch` from the engine's `req` ({prompt, persona, strategy, model,
- *     temperature, ideasPerAgent}). Default forwards those fields verbatim.
+ *     temperature, ideasPerAgent, effort}). Default forwards those fields verbatim.
  *   @param {number}   [options.timeoutMs=120000]  reject a dispatch that runs
  *     longer than this (the host may not enforce its own timeout).
  * @returns {(req:{prompt:string})=>Promise<{ok:true,text:string}>}
@@ -151,8 +151,12 @@ export function createSubagentDispatchComplete(options = {}) {
 }
 
 /** Default request→task mapping: forward the fields a subagent dispatch is
- *  likely to route on, verbatim. Override with `options.mapRequest`. */
-function defaultMapRequest(req = {}) {
+ *  likely to route on, verbatim. Override with `options.mapRequest`.
+ *
+ *  Exported so tests can pin exactly what this forwards against the engine's
+ *  actual request shape (see subagent-dispatch.test.mjs) instead of drifting
+ *  silently when `lib/ideate-core.mjs` adds a new pass-through field. */
+export function defaultMapRequest(req = {}) {
   return {
     prompt: req.prompt,
     persona: req.persona,
@@ -160,6 +164,7 @@ function defaultMapRequest(req = {}) {
     model: req.model,
     temperature: req.temperature,
     ideasPerAgent: req.ideasPerAgent,
+    effort: req.effort,
   };
 }
 

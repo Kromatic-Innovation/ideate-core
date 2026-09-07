@@ -19,6 +19,16 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ## [Unreleased]
 
+### Added
+
+- **Per-agent `effort` pass-through (ideate-core#146).** An agent spec passed to
+  `deps.agents` may now set `effort`; `resolveAgents` forwards it (optional, no
+  default — absent stays distinguishable from an explicit value) and it is
+  included in the `complete` request on both round 1 and round 2, alongside the
+  existing `persona` / `strategy` pass-throughs. The library does not interpret,
+  map, or validate the value — that stays the injected `complete` client's job,
+  same division of responsibility `strategy` already follows.
+
 ## [0.4.0] - 2026-08-02
 
 ### Removed

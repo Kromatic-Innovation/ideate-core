@@ -51,7 +51,7 @@ timeoutMs }`:
 
 - **`dispatch`** (required) — `async (task) => reply`. `task` is
   `mapRequest(req)`; by default that forwards `{ prompt, persona, strategy,
-  model, temperature, ideasPerAgent }`.
+  model, temperature, ideasPerAgent, effort }`.
 - **`mapRequest`** — reshape the engine's `req` into whatever your dispatch
   expects (e.g. `{ agentPrompt, subagentType }`).
 - **`timeoutMs`** (default `120000`) — reject a dispatch that runs longer than

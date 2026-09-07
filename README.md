@@ -55,16 +55,24 @@ observable on the return value, with no preflight required:
   client). `agentsFailed === agentsAttempted` with an empty `candidates` array
   means every round-1 agent failed — the pool is empty *because of that*, not
   because the models had no ideas.
-- `meta.agentErrors` — the reason behind each failure, `{agentId, round,
-  message}`, recorded **by default across every round** (round 1 and any
-  build-on round), whether or not you pass `deps.onAgentError`. Note the scope
-  difference: `agentsFailed` counts round-1 nulls only, while `agentErrors`
-  spans all rounds — `agentErrors.filter(e => e.round === 1).length ===
-  agentsFailed` always holds.
+- `meta.agentErrors` — the reason behind each failure, recorded **by default
+  across every round** (round 1 and any build-on round), whether or not you
+  pass `deps.onAgentError`. Two entry shapes, discriminated by `kind`:
+  - `{kind: "agent", agentId, round, message}` — an agent's own call failed
+    (threw, returned a bad reply, or had no resolvable client). Note the scope
+    difference: `agentsFailed` counts round-1 nulls only, while `agentErrors`
+    spans all rounds — `agentErrors.filter(e => e.round === 1).length ===
+    agentsFailed` always holds.
+  - `{kind: "callback", agentId, agentRound, message}` — your own
+    `deps.onAgentError` threw while reacting to the entry above. Keyed
+    `agentRound`, not `round`, so it never counts toward the invariant above.
+    A throwing `onAgentError` can never fail the run — the throw is
+    contained and recorded here instead.
 - `deps.onAgentError(err, {agentId, round})` — an optional callback fired
   once per failure (same rounds as `agentErrors`) if you want to react to a
   failure as it happens rather than inspecting `meta` afterward; it runs
-  alongside the default recording, not instead of it.
+  alongside the default recording, not instead of it. It may throw
+  synchronously without effect on the run — see `kind: "callback"` above.
 
 ## Install
 

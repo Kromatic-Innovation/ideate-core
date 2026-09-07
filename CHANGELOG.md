@@ -21,6 +21,19 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ### Added
 
+- **Total-failure reason recorded by default (ideate-core#154).** `meta`
+  already reported `agentsAttempted` / `agentsFailed` (ideate-core#90), so a
+  caller could already COUNT total failure without a preflight — but only
+  learn WHY by opting in to `deps.onAgentError`. `ideateCore` now records the
+  reason unconditionally: every per-agent failure (throw, bad reply, or no
+  resolvable client) is pushed onto a new `meta.agentErrors` array
+  (`{agentId, round, message}`), whether or not the caller supplies
+  `deps.onAgentError`. A caller-supplied `onAgentError` still fires exactly
+  once per failure, unshadowed and undoubled — the default recording wraps it
+  rather than replacing it. Control flow, the no-throw robustness contract,
+  and partial-failure behavior (one bad agent still dropped, not fatal) are
+  unchanged. Purely additive; no existing field's shape or meaning changes.
+
 - **Per-agent `effort` pass-through (ideate-core#146).** An agent spec passed to
   `deps.agents` may now set `effort`; `resolveAgents` forwards it (optional, no
   default — absent stays distinguishable from an explicit value) and it is

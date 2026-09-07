@@ -91,6 +91,32 @@ max`) is identical to the API's `output_config.effort`, so it passes through
 
 ### Fixed
 
+- **headless-CLI argv construction now refuses unsafe caller `args` shapes
+  instead of emitting a silently-wrong argv (ideate-core#158).** Three
+  residual cases, all reachable only through caller-supplied `options.args`,
+  survived ideate-core#151/#152/#153: (a) a `--` (end-of-options marker)
+  anywhere in `args` made every injected flag a no-op positional; (b) a
+  trailing flag-shaped token this adapter doesn't know the arity of (e.g.
+  `["-p", "--append-system-prompt"]`) let the injected `-p`/`--output-format`
+  be silently swallowed as that flag's value; (c) a flag-shaped token
+  immediately after this adapter's own `--model`/`--effort` (e.g.
+  `["--effort", "--model"]`) made `stripFlagPair` mistake it for a real flag
+  occurrence, leaving a stray positional that could be read as the prompt.
+  All three led to the same silent-junk-pool terminus this adapter's header
+  exists to prevent. Rather than build a flag-arity table for the `claude`
+  CLI — a maintenance commitment that goes stale silently in the direction of
+  a wrong argv — `createHeadlessCliComplete` now throws `HeadlessCliError` at
+  **construction**, over the caller's static `options.args`, for all three
+  shapes: every check is a shape test on the caller's own `args`, needing no
+  knowledge of the CLI's flag surface beyond the two flags
+  (`--model`/`--effort`) this adapter already forwards itself. Throwing at
+  construction (rather than per-call) means a bad `options.args` fails
+  immediately and loudly instead of surfacing as a dropped agent inside the
+  engine's per-call `complete()` swallow. A trailing bare `--model`/`--effort`
+  with no value is deliberately NOT refused — it self-heals via the existing
+  per-agent `req.model`/`req.effort` forwarding — matching ideate-core#152's
+  already-tested behavior for that shape.
+
 - **headless-CLI `hasFlag` was positional- and alias-blind (ideate-core#153).**
   `ensureRequiredFlags`'s print-flag check (`hasFlag`/`ensureRequiredFlags` in
   `integrations/headless-cli/index.mjs`) scanned `options.args` without

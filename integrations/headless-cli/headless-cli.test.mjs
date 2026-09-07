@@ -450,6 +450,94 @@ test("caller-supplied args survive untouched when the request has no model/effor
   assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--model", "haiku"]);
 });
 
+// ── Argv arity refusals (ideate-core#158) ───────────────────────────────────
+// Decision: refuse the shapes below LOUDLY at construction rather than build
+// a flag-arity table for the `claude` CLI (see ideate-core#158 for the full
+// reasoning). All three throw synchronously from `createHeadlessCliComplete`
+// itself — never per-call — so a bad `options.args` fails immediately
+// instead of surfacing as a dropped agent inside the engine's swallow.
+test("options.args containing -- (end-of-options) is refused at construction (ideate-core#158, case a)", () => {
+  assert.throws(
+    () => createHeadlessCliComplete({ spawn: makeFakeSpawn(), args: ["--", "-p"] }),
+    (e) => e instanceof HeadlessCliError && /end-of-options/.test(e.message),
+  );
+});
+
+test("a trailing bare value-taking-looking flag in options.args is refused at construction (ideate-core#158, case b)", () => {
+  assert.throws(
+    () =>
+      createHeadlessCliComplete({
+        spawn: makeFakeSpawn(),
+        args: ["-p", "--append-system-prompt"],
+      }),
+    (e) => e instanceof HeadlessCliError && /does not know the arity of/.test(e.message),
+  );
+});
+
+test("a flag-shaped value in options.args positioned right after --model/--effort is refused at construction (ideate-core#158, case c)", () => {
+  assert.throws(
+    () =>
+      createHeadlessCliComplete({
+        spawn: makeFakeSpawn(),
+        args: ["--effort", "--model"],
+      }),
+    (e) => e instanceof HeadlessCliError && /--effort's value/.test(e.message),
+  );
+});
+
+test("case (c) refusal also fires when --model precedes the flag-shaped token", () => {
+  assert.throws(
+    () =>
+      createHeadlessCliComplete({
+        spawn: makeFakeSpawn(),
+        args: ["--model", "--effort"],
+      }),
+    (e) => e instanceof HeadlessCliError && /--model's value/.test(e.message),
+  );
+});
+
+test("the throw happens at construction, before any spawn — never inside complete()", () => {
+  let threw = false;
+  try {
+    createHeadlessCliComplete({ spawn: makeFakeSpawn(), args: ["--", "-p"] });
+  } catch (e) {
+    threw = e instanceof HeadlessCliError;
+  }
+  assert.ok(threw, "expected a synchronous construction-time throw");
+});
+
+// Legitimate shapes that must keep working — a refusal that catches any of
+// these is a regression, not a fix (ideate-core#158 verification bar).
+test("legitimate args shapes are NOT refused at construction (ideate-core#158)", async () => {
+  const legitimateShapes = [
+    ["-p", "--output-format", "json"],
+    ["--model", "haiku"],
+    ["--verbose", "-p"],
+    ["-p", "--output-format", "text"],
+    ["-p", "--output-format=text"],
+  ];
+  for (const args of legitimateShapes) {
+    const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+    assert.doesNotThrow(
+      () => createHeadlessCliComplete({ spawn, args }),
+      `unexpected refusal for legitimate shape ${JSON.stringify(args)}`,
+    );
+  }
+});
+
+// Existing, previously-tested-safe trailing-bare-forwarded-flag shapes
+// (ideate-core#152 round 3) must also keep working: these self-heal via the
+// per-agent req.model/req.effort forwarding, so they are excluded from the
+// case (b) refusal even though they are technically flag-shaped and last.
+test("a trailing bare --model/--effort with no value is still NOT refused at construction (self-heals via per-agent forwarding)", () => {
+  assert.doesNotThrow(() =>
+    createHeadlessCliComplete({ spawn: makeFakeSpawn(), args: ["--model"] }),
+  );
+  assert.doesNotThrow(() =>
+    createHeadlessCliComplete({ spawn: makeFakeSpawn(), args: ["--effort"] }),
+  );
+});
+
 // ── Loud failures ────────────────────────────────────────────────────────────
 test("complete() throws (not returns null) when the CLI is missing (ENOENT)", async () => {
   const spawn = makeFakeSpawn({ errorEvent: enoent() });

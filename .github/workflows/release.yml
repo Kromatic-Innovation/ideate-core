@@ -247,10 +247,23 @@ jobs:
             ' CHANGELOG.md > "$NOTES_FILE"
           fi
 
+          # NOTE: no `--latest`. `gh release create` defaults to "automatic
+          # based on date and version", which is the behaviour we want; an
+          # explicit `--latest` forces THIS tag to Latest regardless of how it
+          # orders against existing releases.
+          #
+          # That difference is not hypothetical. A backport patch on an older
+          # line -- tagging v0.5.4 once v0.6.x already exists, an ordinary OSS
+          # practice -- would mark the OLDER release "Latest", demoting the
+          # newer one and putting the Releases tab back into exactly the
+          # disagreement-with-npm state this step exists to fix. The `gh
+          # release view` guard above does not cover it: that only
+          # short-circuits when a Release object already EXISTS for this tag,
+          # and a fresh backport tag has none.
           if [ -s "$NOTES_FILE" ]; then
             echo "Using CHANGELOG.md section for $VERSION."
-            gh release create "$TAG" --title "$TAG" --notes-file "$NOTES_FILE" --latest
+            gh release create "$TAG" --title "$TAG" --notes-file "$NOTES_FILE"
           else
             echo "::warning::No CHANGELOG.md section found for $VERSION; falling back to generated notes."
-            gh release create "$TAG" --title "$TAG" --generate-notes --latest
+            gh release create "$TAG" --title "$TAG" --generate-notes
           fi

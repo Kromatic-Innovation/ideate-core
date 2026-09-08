@@ -230,6 +230,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -247,23 +248,52 @@ jobs:
             ' CHANGELOG.md > "$NOTES_FILE"
           fi
 
-          # NOTE: no `--latest`. `gh release create` defaults to "automatic
-          # based on date and version", which is the behaviour we want; an
-          # explicit `--latest` forces THIS tag to Latest regardless of how it
-          # orders against existing releases.
+          # `make_latest=legacy`, sent explicitly through the REST API rather
+          # than via `gh release create`.
           #
-          # That difference is not hypothetical. A backport patch on an older
-          # line -- tagging v0.5.4 once v0.6.x already exists, an ordinary OSS
-          # practice -- would mark the OLDER release "Latest", demoting the
-          # newer one and putting the Releases tab back into exactly the
-          # disagreement-with-npm state this step exists to fix. The `gh
-          # release view` guard above does not cover it: that only
-          # short-circuits when a Release object already EXISTS for this tag,
+          # Neither `gh release create --latest` NOR omitting the flag gives
+          # version-aware behaviour, and the second one is a trap:
+          #
+          #   * `gh` only sends `make_latest` when `--latest` is passed
+          #     (`cmdutil.NilBoolFlag` leaves the pointer nil; the param is
+          #     added only `if opts.IsLatest != nil`).
+          #   * The REST API defaults an ABSENT `make_latest` to `true`
+          #     ("Defaults to true for newly published releases").
+          #
+          # So omitting the flag lands on `true` exactly like passing it. gh's
+          # own `--latest` help text advertises the default as "automatic based
+          # on date and version" -- that describes `legacy`, which gh never
+          # sends. Trusting that help text yields a no-op change that reads
+          # like a fix.
+          #
+          # `legacy` is the value that actually means "determined based on the
+          # release creation date and higher semantic version", and
+          # `gh release create` has no flag that can express it -- `--latest`
+          # is a bool. Hence the raw API call.
+          #
+          # Why it matters: a backport patch on an older line (tagging v0.5.4
+          # once v0.6.x exists, ordinary OSS practice) would otherwise mark the
+          # OLDER release "Latest", demoting the newer one and putting the
+          # Releases tab back into the disagreement-with-npm state this step
+          # exists to fix. The `gh release view` guard above does not help --
+          # it short-circuits only when a Release already EXISTS for this tag,
           # and a fresh backport tag has none.
           if [ -s "$NOTES_FILE" ]; then
             echo "Using CHANGELOG.md section for $VERSION."
-            gh release create "$TAG" --title "$TAG" --notes-file "$NOTES_FILE"
+            gh api "repos/${GITHUB_REPOSITORY}/releases" \
+              -X POST \
+              -f tag_name="$TAG" \
+              -f name="$TAG" \
+              -f make_latest=legacy \
+              -F body=@"$NOTES_FILE" \
+              --jq '"Created release \(.tag_name) (make_latest=legacy): \(.html_url)"'
           else
             echo "::warning::No CHANGELOG.md section found for $VERSION; falling back to generated notes."
-            gh release create "$TAG" --title "$TAG" --generate-notes
+            gh api "repos/${GITHUB_REPOSITORY}/releases" \
+              -X POST \
+              -f tag_name="$TAG" \
+              -f name="$TAG" \
+              -f make_latest=legacy \
+              -F generate_release_notes=true \
+              --jq '"Created release \(.tag_name) (make_latest=legacy, generated notes): \(.html_url)"'
           fi

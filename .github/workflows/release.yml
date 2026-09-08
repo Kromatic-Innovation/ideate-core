@@ -27,6 +27,11 @@ name: Release
 #
 # To change the npm publish flow, edit THIS template and re-run the sync
 # script — never hand-edit a repo's `.github/workflows/release.yml`.
+#
+# After the npm publish, this workflow also creates the GitHub Release object
+# for the tag, using that version's own `CHANGELOG.md` section as the body
+# (tickle-stick#184). Without it the Releases tab drifts behind the registry:
+# tickle-stick advertised v0.5.0 as "Latest" while npm served 0.6.3.
 # cwc#1559 / cwc#1439. End home: cron-fleet (rides cwc#1107).
 #
 # ─── Why template-and-sync, not a cross-repo reusable workflow ───────────────
@@ -78,7 +83,10 @@ jobs:
     name: Build + publish to npm
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # `write`, not `read`: the post-publish step creates a GitHub Release
+      # object (tickle-stick#184). Still the minimum this job needs — no
+      # packages/deployments/actions scopes are granted.
+      contents: write
       id-token: write         # npm provenance attestations via OIDC
     steps:
       # fetch-depth: 0 — the "tag is on merged code" assertion below needs the
@@ -182,16 +190,67 @@ jobs:
       #
       # Strip `publishConfig.registry` before publishing (cwc#1590; load-bearing,
       # named by cwc#1559's own scope and then dropped). A repo may set
-      # `publishConfig.registry` (e.g. panelist pins its org-scoped GitHub
-      # Packages copy for a separate `publish.yml`), and that field takes
+      # `publishConfig.registry` to pin an org-scoped registry (e.g. GitHub
+      # Packages) for a separate publish path, and that field takes
       # precedence over setup-node's `registry-url` — so verbatim the template
       # would try to publish the PUBLIC unscoped package to the scoped registry
       # and fail. Deleting the key routes the trusted-publishing publish to
       # `registry.npmjs.org`. `npm pkg delete` on an absent key is a no-op, so
       # the same bytes are correct for repos with `publishConfig: null`
-      # (ideate-core / tickle-stick) too.
+      # (currently all three npm publishers — ideate-core / panelist /
+      # tickle-stick — cwc#2905) too.
       - name: Strip publishConfig.registry (publish to npmjs, not a scoped registry)
         run: npm pkg delete publishConfig.registry
 
       - name: Publish to npm
         run: npm publish --provenance --access public
+
+      # Gap 4 (tickle-stick#184): the tag was published to npm but no GitHub
+      # Release object was ever created, so a repo's Releases tab kept showing
+      # whichever old version last got one by hand. tickle-stick sat
+      # advertising v0.5.0 as "Latest" while npm correctly served 0.6.3 — two
+      # public surfaces disagreeing about the current version, with the staler
+      # one being the more prominent for anyone browsing the repo.
+      #
+      # Runs AFTER the publish, deliberately: the npm publish IS the release.
+      # A Release object created before a failed publish would advertise a
+      # version that does not exist on the registry — the same disagreement in
+      # the opposite direction, and the more damaging one.
+      #
+      # Body is this version's own CHANGELOG.md section where one exists,
+      # falling back to --generate-notes. The awk matches the Keep-a-Changelog
+      # heading with index()==1 rather than a regex, so the dots in a version
+      # are literal and `1.2.3` cannot match `1x2x3`; it stops at the next
+      # `## [` heading.
+      #
+      # Idempotent: `gh release view` short-circuits when the Release already
+      # exists, so re-running this workflow against an existing tag is a no-op
+      # rather than a failure.
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists — nothing to do."
+            exit 0
+          fi
+
+          VERSION="${TAG#v}"
+          NOTES_FILE="$(mktemp)"
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="$VERSION" '
+              index($0, "## [" ver "]") == 1 { f = 1; next }
+              f && index($0, "## [") == 1 { exit }
+              f { print }
+            ' CHANGELOG.md > "$NOTES_FILE"
+          fi
+
+          if [ -s "$NOTES_FILE" ]; then
+            echo "Using CHANGELOG.md section for $VERSION."
+            gh release create "$TAG" --title "$TAG" --notes-file "$NOTES_FILE" --latest
+          else
+            echo "::warning::No CHANGELOG.md section found for $VERSION; falling back to generated notes."
+            gh release create "$TAG" --title "$TAG" --generate-notes --latest
+          fi

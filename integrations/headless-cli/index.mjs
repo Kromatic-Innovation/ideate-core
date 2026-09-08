@@ -104,24 +104,22 @@ const DEFAULT_TIMEOUT_MS = 120000;
  *  equally-standard CLI forms (`--model value` or `--model=value`) the
  *  caller used.
  *
- *  NOTE (ideate-core#153, noticed but not fixed): this walk is positional-
- *  blind the same way `hasFlag` was — `stripFlagPair(["--effort","--model"],
- *  "--model")` treats the literal string "--model" (actually `--effort`'s
- *  value) as a flag occurrence and strips it. This is worse than a dropped
- *  value: `--model`'s own consumed-value logic then eats the NEXT token as
- *  if it belonged to the (removed) "--model" occurrence, so with
- *  `req.model="opus"` set, `["--effort","--model"]` becomes
+ *  NOTE (ideate-core#153, noticed; closed by ideate-core#158): this walk is
+ *  positional-blind the same way `hasFlag` was — `stripFlagPair(["--effort",
+ *  "--model"], "--model")` treats the literal string "--model" (actually
+ *  `--effort`'s value) as a flag occurrence and strips it. This is worse
+ *  than a dropped value: `--model`'s own consumed-value logic then eats the
+ *  NEXT token as if it belonged to the (removed) "--model" occurrence, so
+ *  with `req.model="opus"` set, `["--effort","--model"]` would become
  *  `["--effort","--model","opus","-p","--output-format","json"]` — `opus`
- *  survives as a stray trailing positional argument, which on a `-p` run
+ *  surviving as a stray trailing positional argument, which on a `-p` run
  *  can be read as (or concatenated into) the prompt, ahead of the real one
- *  fed on stdin. That is a silent-wrong-output path, not a cosmetically odd
- *  one. `assertForwardableRoutingValue` blocks a flag-shaped value from the
- *  per-agent *request* (`req.model`/`req.effort`), but has no visibility
- *  into caller-supplied `args` — which is exactly why this gap exists here
- *  and not there. Only reachable via a contrived caller `args` (a value that
- *  is itself an exact flag name) combined with `req.model`/`req.effort`
- *  being set, so it is lower severity than ideate-core#153's cases (a)/(b)
- *  and out of scope here — see the file's PR discussion for why this and
+ *  fed on stdin. `assertForwardableRoutingValue` blocks a flag-shaped value
+ *  from the per-agent *request* (`req.model`/`req.effort`), but has no
+ *  visibility into caller-supplied `args` — which is exactly why this gap
+ *  existed here and not there. `assertSafeBaseArgs` now refuses this shape
+ *  at construction (see its case (c)) rather than leaving `stripFlagPair`
+ *  to silently mishandle it — see the file's PR discussion for why this and
  *  `hasFlag`/`hasPrintFlag` were not unified into one helper. */
 function stripFlagPair(args, flag) {
   const eqPrefix = `${flag}=`;
@@ -201,6 +199,123 @@ function hasPrintFlag(args) {
     if (!looksLikeValueOfPrecedingFlag) return true;
   }
   return false;
+}
+
+/** The two routing flags THIS adapter itself forwards/manipulates (see
+ *  `stripFlagPair` above and the per-agent forwarding in `complete()`). This
+ *  is the only flag-arity knowledge this file has — not a general table of
+ *  the `claude` CLI's flag surface (ideate-core#158 decision: refuse
+ *  unsafe caller `args` shapes rather than build one). */
+const FORWARDED_ROUTING_FLAGS = ["--model", "--effort"];
+
+/** Flags safe to be the LAST token in a caller's `args` even though
+ *  something else still needs to be appended after them — `PRINT_FLAG_NAMES`
+ *  ONLY: `-p`/`--print` are genuinely zero-arity (confirmed via `claude
+ *  --help`), so nothing appended after them can ever be consumed as their
+ *  value.
+ *
+ *  `FORWARDED_ROUTING_FLAGS` were previously included here on the theory
+ *  that a trailing bare `--model`/`--effort` "self-heals" via the
+ *  strip/append forwarding in `complete()` — but that safety is a RUNTIME
+ *  fact (whether THIS call's `req.model`/`req.effort` happens to be set),
+ *  which a CONSTRUCTION-time check cannot observe. A call that never
+ *  supplies the matching `req` field hits the CLI's real behavior: bare
+ *  `--model` errors with "argument missing" after shifting the next token
+ *  (here, the injected `-p`) as its value, and bare `--effort` is worse —
+ *  the CLI only *warns* "Unknown --effort value '-p'" and proceeds with no
+ *  print flag, so `defaultExtractText`'s prose fallback returns
+ *  `{ok:true, text:"<prose>"}` with no throw anywhere. That is exactly the
+ *  silent-junk-pool terminus ideate-core#158 exists to close. So a trailing
+ *  bare `--model`/`--effort` is now refused like any other arity-unknown
+ *  trailing flag — a caller who always sets the matching `req` field pays a
+ *  one-element edit: drop the bare flag from `options.args` and let the
+ *  per-agent `req.model`/`req.effort` forwarding add it instead (the case
+ *  (b) throw message below already says this). */
+const TRAILING_FLAG_SAFE_LIST = new Set(PRINT_FLAG_NAMES);
+
+/** True if `token` is shaped like a flag occurrence — starts with `-` and is
+ *  NOT the single-token `flag=value` form (which is self-contained and
+ *  cannot consume anything appended after it). */
+function looksLikeFlag(token) {
+  return typeof token === "string" && token.startsWith("-") && !token.includes("=");
+}
+
+/**
+ * Refuse, at `createHeadlessCliComplete` CONSTRUCTION (over the caller's
+ * static `options.args`, never per-call), the caller-`args` shapes this
+ * adapter cannot safely extend (ideate-core#158). Throwing here — rather
+ * than per-call — means a bad `options.args` fails immediately and loudly,
+ * instead of surfacing as a dropped agent inside the engine's per-call
+ * `complete()` swallow on whichever call happens to hit it.
+ *
+ * Deliberately NOT a flag-arity table for the `claude` CLI: every check
+ * below is a shape test on the caller's own `args` array. The one place
+ * this file has any flag-specific knowledge is `FORWARDED_ROUTING_FLAGS`
+ * (`--model`/`--effort`) — flags this adapter already forwards itself, so
+ * knowing they take a value is not new knowledge being introduced here.
+ */
+function assertSafeBaseArgs(args) {
+  // (a) ideate-core#158: `--` is the CLI's end-of-options marker — every
+  // token after it is a positional by definition, so an injected -p/
+  // --output-format placed after it (or before it, immaterial: the marker
+  // makes the injected flags for THIS array meaningless once it appears at
+  // all) has no effect. Whatever the caller intended, this adapter cannot
+  // safely extend an args array containing "--".
+  if (args.includes("--")) {
+    throw new HeadlessCliError(
+      'headless-cli adapter: options.args contains "--" (the CLI\'s end-of-options ' +
+        "marker) — every token after it is treated as a positional, so this adapter's " +
+        "injected -p/--output-format flags would have no effect (ideate-core#158). " +
+        'Remove "--" from options.args, or build the full argv yourself and pass ' +
+        "options.extractText/options.command without relying on this adapter's flag injection.",
+    );
+  }
+
+  // (c) ideate-core#158: one of THIS adapter's own forwarded routing flags
+  // followed by a flag-shaped token. `stripFlagPair` matches a flag
+  // occurrence by exact string equality, positional-blind — it cannot tell
+  // that token apart from a real occurrence of that flag, so removing it
+  // (when the matching req field is later forwarded) desynchronizes the
+  // array and leaves the flag-shaped token as a stray positional. Checked
+  // BEFORE the case (b) trailing-token check below so this more specific
+  // diagnosis wins when a shape (like `["--effort", "--model"]`) matches
+  // both — its own trailing token is also arity-unknown-flag-shaped.
+  for (let i = 0; i < args.length; i++) {
+    if (FORWARDED_ROUTING_FLAGS.includes(args[i]) && looksLikeFlag(args[i + 1])) {
+      throw new HeadlessCliError(
+        `headless-cli adapter: options.args has ${args[i]} immediately followed by ` +
+          `${JSON.stringify(args[i + 1])}, a flag-shaped token that would be treated ` +
+          `as ${args[i]}'s value (ideate-core#158). Give ${args[i]} a real value in ` +
+          `options.args, or drop it from options.args and forward it per-agent via ` +
+          `req.${args[i].slice(2)} instead.`,
+      );
+    }
+  }
+
+  // (b) ideate-core#158: a trailing flag-shaped token this file does not
+  // know the arity of, where `ensureRequiredFlags` (always appending at the
+  // END of the array) would actually have something to append. Gated on
+  // `needsInjection`: when `-p` and `--output-format` are BOTH already
+  // present, `ensureRequiredFlags` is a no-op regardless of what the last
+  // token is, so there is nothing for this adapter to silently mis-append —
+  // whatever the caller's own trailing flag does with nothing (or a stale
+  // value) after it is a pre-existing caller-args defect the CLI itself
+  // reports loudly (a real parse error), not the silent-wrong-output class
+  // ideate-core#158 targets. When injection WOULD happen, a trailing flag
+  // this file has no arity knowledge of (beyond `PRINT_FLAG_NAMES`, which
+  // are genuinely zero-arity) risks the injected flag/value being silently
+  // consumed as that trailing flag's argument instead.
+  const needsInjection = !hasPrintFlag(args) || !hasFlag(args, "--output-format");
+  const last = args[args.length - 1];
+  if (needsInjection && looksLikeFlag(last) && !TRAILING_FLAG_SAFE_LIST.has(last)) {
+    throw new HeadlessCliError(
+      `headless-cli adapter: options.args ends with ${JSON.stringify(last)}, a flag ` +
+        "this adapter does not know the arity of — appending -p/--output-format " +
+        `after it risks being silently consumed as ${JSON.stringify(last)}'s value ` +
+        `(ideate-core#158). Give ${JSON.stringify(last)} an explicit value in ` +
+        "options.args, or move it earlier in the array so it is not last.",
+    );
+  }
 }
 
 /**
@@ -382,6 +497,7 @@ export function defaultExtractText(stdout) {
 export function createHeadlessCliComplete(options = {}) {
   const command = options.command || DEFAULT_COMMAND;
   const baseArgs = Array.isArray(options.args) ? options.args : DEFAULT_ARGS;
+  assertSafeBaseArgs(baseArgs);
   const spawn = typeof options.spawn === "function" ? options.spawn : realSpawn;
   const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : DEFAULT_TIMEOUT_MS;
   const cwd = options.cwd;

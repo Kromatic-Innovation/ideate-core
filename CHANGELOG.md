@@ -19,6 +19,8 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-07
+
 ### Added
 
 - **A throwing `deps.onAgentError` can no longer reject `ideateCore` (ideate-core#157).**
@@ -486,6 +488,7 @@ Packaging & release infrastructure (no engine behavior):
 - Routine GitHub Actions dependency bumps via Dependabot (`8e45570`, `5176681`,
   `1ec8072`, `d92fd94`, `fe05196`, `391ae3a`).
 
+[0.5.0]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.2.0...v0.3.0

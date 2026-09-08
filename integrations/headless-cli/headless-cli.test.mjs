@@ -348,32 +348,38 @@ test("a trailing bare --model with no value is stripped safely (no crash, no str
   assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--model", "opus"]);
 });
 
-// Regression (ideate-core#152 review round 3, finding 1): the PREVIOUS shape
-// of this test put `-p`/`--output-format json` BEFORE the trailing bare
-// `--model`, so the token `stripFlagPair` consumed as `--model`'s "value" was
-// nothing — it passed even when `ensureRequiredFlags` ran once at
-// construction and got its injected `-p` eaten by the very strip it was
-// supposed to survive. These two cases put the bare flag LAST with no
-// required flags already present, which is exactly the shape that broke:
-// `ensureRequiredFlags` (if applied to `baseArgs` up front) would append
-// `-p`/`--output-format json` directly after the bare flag, positioning `-p`
-// exactly where the strip expects to find — and delete — the flag's value.
-test("a caller args array that is ONLY a trailing bare --model still ends up with -p in the final argv", async () => {
-  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
-  const complete = createHeadlessCliComplete({ spawn, args: ["--model"] });
-  await complete({ prompt: "x", model: "opus" });
-  const argv = spawn.calls[0].args;
-  assert.ok(argv.includes("-p"), `-p missing from argv: ${JSON.stringify(argv)}`);
-  assert.deepEqual(argv, ["--model", "opus", "-p", "--output-format", "json"]);
+// Regression history (ideate-core#152 review round 3, finding 1): the
+// PREVIOUS shape of these two tests put `-p`/`--output-format json` BEFORE
+// the trailing bare `--model`/`--effort`, so `stripFlagPair` had nothing to
+// consume as the flag's "value" — it passed even when `ensureRequiredFlags`
+// ran once at construction and got its injected `-p` eaten by the very
+// strip it was supposed to survive.
+//
+// Superseded (ideate-core#158 review): these two were then rewritten to put
+// the bare flag LAST and pass a matching `req.model`/`req.effort`, which
+// made `-p` survive — but only because THAT call happened to supply the
+// field. `TRAILING_FLAG_SAFE_LIST` treated the shape as unconditionally
+// safe on that basis, which is a RUNTIME fact a CONSTRUCTION-time check
+// cannot observe: a call to the SAME `complete` that omits `req.model`
+// hits the real CLI's behavior — `claude --model` shifts the next token
+// (the injected `-p`) as `--model`'s value unconditionally, and
+// `claude --effort -p` is worse, only warning and proceeding with no print
+// flag, landing in the exact silent `{ok:true, text:"<prose>"}` terminus
+// ideate-core#158 exists to close. So a trailing bare `--model`/`--effort`
+// is now refused at construction like any other arity-unknown trailing
+// flag, regardless of what any individual call's `req` supplies.
+test("a caller args array that is ONLY a trailing bare --model is refused at construction (ideate-core#158)", () => {
+  assert.throws(
+    () => createHeadlessCliComplete({ spawn: makeFakeSpawn(), args: ["--model"] }),
+    (e) => e instanceof HeadlessCliError && /does not know the arity of/.test(e.message),
+  );
 });
 
-test("a caller args array that is ONLY a trailing bare --effort still ends up with -p in the final argv", async () => {
-  const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
-  const complete = createHeadlessCliComplete({ spawn, args: ["--effort"] });
-  await complete({ prompt: "x", effort: "high" });
-  const argv = spawn.calls[0].args;
-  assert.ok(argv.includes("-p"), `-p missing from argv: ${JSON.stringify(argv)}`);
-  assert.deepEqual(argv, ["--effort", "high", "-p", "--output-format", "json"]);
+test("a caller args array that is ONLY a trailing bare --effort is refused at construction (ideate-core#158)", () => {
+  assert.throws(
+    () => createHeadlessCliComplete({ spawn: makeFakeSpawn(), args: ["--effort"] }),
+    (e) => e instanceof HeadlessCliError && /does not know the arity of/.test(e.message),
+  );
 });
 
 test("repeated --model occurrences in caller args all collapse to the one forwarded pair", async () => {
@@ -448,6 +454,81 @@ test("caller-supplied args survive untouched when the request has no model/effor
   const complete = createHeadlessCliComplete({ spawn, args: customArgs });
   await complete({ prompt: "x" });
   assert.deepEqual(spawn.calls[0].args, ["-p", "--output-format", "json", "--model", "haiku"]);
+});
+
+// ── Argv arity refusals (ideate-core#158) ───────────────────────────────────
+// Decision: refuse the shapes below LOUDLY at construction rather than build
+// a flag-arity table for the `claude` CLI (see ideate-core#158 for the full
+// reasoning). All three throw synchronously from `createHeadlessCliComplete`
+// itself — never per-call — so a bad `options.args` fails immediately
+// instead of surfacing as a dropped agent inside the engine's swallow.
+test("options.args containing -- (end-of-options) is refused at construction (ideate-core#158, case a)", () => {
+  assert.throws(
+    () => createHeadlessCliComplete({ spawn: makeFakeSpawn(), args: ["--", "-p"] }),
+    (e) => e instanceof HeadlessCliError && /end-of-options/.test(e.message),
+  );
+});
+
+test("a trailing bare value-taking-looking flag in options.args is refused at construction (ideate-core#158, case b)", () => {
+  assert.throws(
+    () =>
+      createHeadlessCliComplete({
+        spawn: makeFakeSpawn(),
+        args: ["-p", "--append-system-prompt"],
+      }),
+    (e) => e instanceof HeadlessCliError && /does not know the arity of/.test(e.message),
+  );
+});
+
+test("a flag-shaped value in options.args positioned right after --model/--effort is refused at construction (ideate-core#158, case c)", () => {
+  assert.throws(
+    () =>
+      createHeadlessCliComplete({
+        spawn: makeFakeSpawn(),
+        args: ["--effort", "--model"],
+      }),
+    (e) => e instanceof HeadlessCliError && /--effort's value/.test(e.message),
+  );
+});
+
+test("case (c) refusal also fires when --model precedes the flag-shaped token", () => {
+  assert.throws(
+    () =>
+      createHeadlessCliComplete({
+        spawn: makeFakeSpawn(),
+        args: ["--model", "--effort"],
+      }),
+    (e) => e instanceof HeadlessCliError && /--model's value/.test(e.message),
+  );
+});
+
+test("the throw happens at construction, before any spawn — never inside complete()", () => {
+  let threw = false;
+  try {
+    createHeadlessCliComplete({ spawn: makeFakeSpawn(), args: ["--", "-p"] });
+  } catch (e) {
+    threw = e instanceof HeadlessCliError;
+  }
+  assert.ok(threw, "expected a synchronous construction-time throw");
+});
+
+// Legitimate shapes that must keep working — a refusal that catches any of
+// these is a regression, not a fix (ideate-core#158 verification bar).
+test("legitimate args shapes are NOT refused at construction (ideate-core#158)", async () => {
+  const legitimateShapes = [
+    ["-p", "--output-format", "json"],
+    ["--model", "haiku"],
+    ["--verbose", "-p"],
+    ["-p", "--output-format", "text"],
+    ["-p", "--output-format=text"],
+  ];
+  for (const args of legitimateShapes) {
+    const spawn = makeFakeSpawn({ stdout: '{"is_error":false,"result":"ok"}', code: 0 });
+    assert.doesNotThrow(
+      () => createHeadlessCliComplete({ spawn, args }),
+      `unexpected refusal for legitimate shape ${JSON.stringify(args)}`,
+    );
+  }
 });
 
 // ── Loud failures ────────────────────────────────────────────────────────────

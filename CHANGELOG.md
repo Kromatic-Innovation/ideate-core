@@ -44,6 +44,17 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
   record it was reacting to. A caller supplying no `onAgentError` sees no
   behavior change. The contract is now stated in the `onAgentError` JSDoc.
 
+  An **async** `onAgentError` that rejects (the most natural way to write
+  this hook — `async (e) => { await logToService(e); }`) is also contained:
+  a rejection handler is attached so it can never crash the process via an
+  unhandled rejection. Unlike a synchronous throw, a rejection is **not**
+  recorded in `meta.agentErrors` — it settles after this call returns,
+  possibly after `ideateCore` has already returned `meta` to the caller, and
+  there is no way to fold it in without either blocking the run on the
+  caller's callback or mutating an array the caller already holds. Both are
+  worse than the gap. `README.md` documents this asymmetry rather than
+  overstating the guarantee.
+
 - **Total-failure reason recorded by default (ideate-core#154).** `meta`
   already reported `agentsAttempted` / `agentsFailed` (ideate-core#90), so a
   caller could already COUNT total failure without a preflight — but only

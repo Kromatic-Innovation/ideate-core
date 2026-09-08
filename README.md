@@ -64,15 +64,24 @@ observable on the return value, with no preflight required:
     spans all rounds — `agentErrors.filter(e => e.round === 1).length ===
     agentsFailed` always holds.
   - `{kind: "callback", agentId, agentRound, message}` — your own
-    `deps.onAgentError` threw while reacting to the entry above. Keyed
-    `agentRound`, not `round`, so it never counts toward the invariant above.
-    A throwing `onAgentError` can never fail the run — the throw is
-    contained and recorded here instead.
+    `deps.onAgentError` **threw synchronously** while reacting to the entry
+    above. Keyed `agentRound`, not `round`, so it never counts toward the
+    invariant above.
 - `deps.onAgentError(err, {agentId, round})` — an optional callback fired
   once per failure (same rounds as `agentErrors`) if you want to react to a
   failure as it happens rather than inspecting `meta` afterward; it runs
-  alongside the default recording, not instead of it. It may throw
-  synchronously without effect on the run — see `kind: "callback"` above.
+  alongside the default recording, not instead of it. A **synchronous**
+  throw can never fail the run — it is contained and recorded as
+  `kind: "callback"` above. An **async** callback that *rejects* (e.g.
+  `onAgentError: async (e) => { await logToService(e); }` where the
+  `await` throws) is also contained — it can never crash the process via an
+  unhandled rejection — but the rejection is **not** recorded in
+  `meta.agentErrors`: it settles after `ideateCore` may have already
+  returned, and there is no way to fold it into `meta` without either
+  blocking the run on your callback or mutating an object you already hold.
+  If you need to observe an async failure reliably, do your own
+  `try/catch`/logging *inside* the callback rather than relying on the
+  return value.
 
 ## Install
 

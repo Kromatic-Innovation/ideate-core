@@ -55,16 +55,33 @@ observable on the return value, with no preflight required:
   client). `agentsFailed === agentsAttempted` with an empty `candidates` array
   means every round-1 agent failed — the pool is empty *because of that*, not
   because the models had no ideas.
-- `meta.agentErrors` — the reason behind each failure, `{agentId, round,
-  message}`, recorded **by default across every round** (round 1 and any
-  build-on round), whether or not you pass `deps.onAgentError`. Note the scope
-  difference: `agentsFailed` counts round-1 nulls only, while `agentErrors`
-  spans all rounds — `agentErrors.filter(e => e.round === 1).length ===
-  agentsFailed` always holds.
+- `meta.agentErrors` — the reason behind each failure, recorded **by default
+  across every round** (round 1 and any build-on round), whether or not you
+  pass `deps.onAgentError`. Two entry shapes, discriminated by `kind`:
+  - `{kind: "agent", agentId, round, message}` — an agent's own call failed
+    (threw, returned a bad reply, or had no resolvable client). Note the scope
+    difference: `agentsFailed` counts round-1 nulls only, while `agentErrors`
+    spans all rounds — `agentErrors.filter(e => e.round === 1).length ===
+    agentsFailed` always holds.
+  - `{kind: "callback", agentId, agentRound, message}` — your own
+    `deps.onAgentError` **threw synchronously** while reacting to the entry
+    above. Keyed `agentRound`, not `round`, so it never counts toward the
+    invariant above.
 - `deps.onAgentError(err, {agentId, round})` — an optional callback fired
   once per failure (same rounds as `agentErrors`) if you want to react to a
   failure as it happens rather than inspecting `meta` afterward; it runs
-  alongside the default recording, not instead of it.
+  alongside the default recording, not instead of it. A **synchronous**
+  throw can never fail the run — it is contained and recorded as
+  `kind: "callback"` above. An **async** callback that *rejects* (e.g.
+  `onAgentError: async (e) => { await logToService(e); }` where the
+  `await` throws) is also contained — it can never crash the process via an
+  unhandled rejection — but the rejection is **not** recorded in
+  `meta.agentErrors`: it settles after `ideateCore` may have already
+  returned, and there is no way to fold it into `meta` without either
+  blocking the run on your callback or mutating an object you already hold.
+  If you need to observe an async failure reliably, do your own
+  `try/catch`/logging *inside* the callback rather than relying on the
+  return value.
 
 ## Install
 

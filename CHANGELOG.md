@@ -21,6 +21,40 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ### Added
 
+- **A throwing `deps.onAgentError` can no longer reject `ideateCore` (ideate-core#157).**
+  `onAgentError` is a diagnostic hook — it exists so a caller can observe a
+  per-agent failure, and should never be able to cause one. Previously a
+  callback that itself threw escaped the surrounding `Promise.all` and
+  rejected the whole run, converting a survivable partial failure into a hard
+  failure because of a bug in the caller's _logging_, not the engine. The
+  throw is now contained at its single call site and recorded as its own
+  `meta.agentErrors` entry, `{kind: "callback", agentId, agentRound, message}`,
+  distinct from the `{kind: "agent", agentId, round, message}` entry already
+  recorded (ideate-core#154) for the underlying agent failure that triggered
+  the callback — both facts about one agent (it failed, and the caller's
+  handler then threw) are kept separable so a consumer counting agent
+  failures via `kind: "agent"` never over-counts a broken callback as one.
+  Existing `kind: "agent"` entries are unchanged except for the added `kind`
+  field. The callback's round is deliberately keyed `agentRound`, not
+  `round`, so the ideate-core#155 invariant
+  (`agentErrors.filter(e => e.round === 1).length === agentsFailed`) keeps
+  holding even when a round-1 callback throws. Ordering is unchanged and
+  still pinned: the agent's own failure is always recorded before the
+  caller's callback runs, so a throwing callback can never suppress the
+  record it was reacting to. A caller supplying no `onAgentError` sees no
+  behavior change. The contract is now stated in the `onAgentError` JSDoc.
+
+  An **async** `onAgentError` that rejects (the most natural way to write
+  this hook — `async (e) => { await logToService(e); }`) is also contained:
+  a rejection handler is attached so it can never crash the process via an
+  unhandled rejection. Unlike a synchronous throw, a rejection is **not**
+  recorded in `meta.agentErrors` — it settles after this call returns,
+  possibly after `ideateCore` has already returned `meta` to the caller, and
+  there is no way to fold it in without either blocking the run on the
+  caller's callback or mutating an array the caller already holds. Both are
+  worse than the gap. `README.md` documents this asymmetry rather than
+  overstating the guarantee.
+
 - **Total-failure reason recorded by default (ideate-core#154).** `meta`
   already reported `agentsAttempted` / `agentsFailed` (ideate-core#90), so a
   caller could already COUNT total failure without a preflight — but only

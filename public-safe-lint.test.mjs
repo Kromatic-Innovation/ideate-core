@@ -115,7 +115,11 @@ test("defect 2: real initials after 'agreed with' still are a hit", () => {
 });
 
 test("defect 2: per-request rule ignores an all-lowercase word", () => {
-  const r = scan(mkTree({ "prose.md": "Shipped per the request of the team." }));
+  // The rule means `per <Given-name>'s request`. Under the old
+  // case-insensitive scan the capital in [A-Z] meant nothing, so an ordinary
+  // lowercase noun in that slot fired it. This fixture must stay a phrase the
+  // buggy form DOES match, or it guards nothing.
+  const r = scan(mkTree({ "prose.md": "Shipped per user's request, not ours." }));
   assert.equal(r.status, 0, r.out);
 });
 

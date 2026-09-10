@@ -23,6 +23,22 @@
 #
 # Adopt by copying this file and its companion scanner script into a repo's
 # own workflow directory, unmodified.
+#
+# Scoping without editing either copied file: a repo where one of the rules
+# does not apply (say, a public repo with a public issue tracker, where a
+# bare numeric issue reference resolves for exactly the reader the file is
+# written for) adds a `.public-safe-lint.conf` file to its own root:
+#
+#     disable = bare-issue-ref
+#     exclude-dir = vendor
+#     exclude = *.min.js
+#
+# Both copied files stay byte-identical to the upstream template, so the
+# repo keeps taking template updates. The scanner still refuses to report a
+# clean verdict unless every rule that remains active has matched its own
+# known-bad seed, and its canary line names how many rules that was -- so a
+# scoped config cannot be mistaken for, or degrade into, a scan of nothing.
+# See the companion scanner script's comment header for the full format.
 
 name: Public-Safe Lint
 

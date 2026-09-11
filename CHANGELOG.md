@@ -48,10 +48,14 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
     the old name still works as a deprecated alias (`deps.persona ||
     deps.temperature || "human"`), so no existing caller silently loses their
     bucket label.
-  - `temperature` now means ONLY the numeric sampling parameter on an agent
-    (`resolveAgents`'s returned agent shape, and the `round1PromptArgs`
-    prompt-builder surface's `temperatureValue`) — never a label, anywhere in
-    the candidate record.
+  - Within the candidate record, `temperature` now means ONLY the numeric
+    sampling parameter on an agent (`resolveAgents`'s returned agent shape) —
+    never a label. One caller-facing surface is deliberately **unchanged**:
+    `round1PromptArgs` still passes `temperature` (the persona label) alongside
+    `temperatureValue` (the number) to `deps.buildRound1Prompt` /
+    `deps.buildRound2Prompt`, retained for back-compat with pre-S1 prompt
+    builders that branched on the stance label. Prompt builders are unaffected
+    by this release.
   - **Known downstream consumer:** `ideate-core-evals` pins
     `"ideate-core": "0.5.0"`. That pin is deliberately NOT being moved by this
     change — 431+ paid-for eval cells are scored against the 0.5.0 shape and

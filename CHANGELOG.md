@@ -19,6 +19,48 @@ the [release workflow](.github/workflows/release.yml) to publish to public npm.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-11
+
+### Removed
+
+- **`candidate.temperature` is gone; it was a duplicate of `candidate.persona`,
+  not a distinct field (ideate-core#166).** The field name overloaded a single
+  word across two object types: on an **agent**, `temperature` is the numeric
+  sampling parameter (`DEFAULT_PERSONAS` sets 0.4–1.0); on an emitted
+  **candidate**, it was a *string* — the persona/brief label. All three
+  `buildCandidate` call sites (round 1, round 2, `foldHumanIdeas`) always set
+  `temperature` and `persona` to the exact same value, and `buildCandidate`
+  reapplies both core fields from `ctx` last, so `normalizeExtra` could never
+  make them diverge — the field carried no information `persona` didn't
+  already carry. That overload is the surviving cause of the ideate-core#87
+  duplicate-candidate-ID defect (fixed there by keying ids on `agentId`
+  instead of the label) and is the reason `lib/feedback.mjs`'s S4 regeneration
+  path has carried a standing warning comment since: a guard that has to be
+  remembered at every call site is a landmine with a sign next to it, not a
+  guard.
+
+  **For downstream consumers:**
+  - `candidate.temperature` is GONE; read `candidate.persona`, which always
+    carried the identical value.
+  - The `normalizeExtra(raw, ctx)` and `makeId(ctx)` hook contexts no longer
+    carry `ctx.temperature`; use `ctx.persona`.
+  - `foldHumanIdeas`'s `deps.temperature` option is renamed `deps.persona`;
+    the old name still works as a deprecated alias (`deps.persona ||
+    deps.temperature || "human"`), so no existing caller silently loses their
+    bucket label.
+  - Within the candidate record, `temperature` now means ONLY the numeric
+    sampling parameter on an agent (`resolveAgents`'s returned agent shape) —
+    never a label. One caller-facing surface is deliberately **unchanged**:
+    `round1PromptArgs` still passes `temperature` (the persona label) alongside
+    `temperatureValue` (the number) to `deps.buildRound1Prompt` /
+    `deps.buildRound2Prompt`, retained for back-compat with pre-S1 prompt
+    builders that branched on the stance label. Prompt builders are unaffected
+    by this release.
+  - **Known downstream consumer:** `ideate-core-evals` pins
+    `"ideate-core": "0.5.0"`. That pin is deliberately NOT being moved by this
+    change — 431+ paid-for eval cells are scored against the 0.5.0 shape and
+    would stale if the pin moved without a deliberate, separate migration.
+
 ## [0.5.0] - 2026-09-07
 
 ### Added
@@ -488,6 +530,7 @@ Packaging & release infrastructure (no engine behavior):
 - Routine GitHub Actions dependency bumps via Dependabot (`8e45570`, `5176681`,
   `1ec8072`, `d92fd94`, `fe05196`, `391ae3a`).
 
+[0.6.0]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/Kromatic-Innovation/ideate-core/compare/v0.3.0...v0.3.1

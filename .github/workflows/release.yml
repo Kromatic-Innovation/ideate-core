@@ -4,7 +4,8 @@ name: Release
 #
 # This is the single source of truth for `release.yml` (npm publish) across
 # every Internal Platform repo that publishes to npm (registry
-# `publishingScheme: npm` — currently ideate-core / panelist / tickle-stick).
+# `publishingScheme: npm` — currently ideate-core / panelist /
+# aux-comprehension-test).
 # It is versioned in code-workspace-config at `templates/release-npm.yml` and
 # synced into each npm repo by `scripts/sync_promote_workflows.py` (mirror of
 # `derive_repo_configs.py` / the `promote-main.yml` sync).
@@ -22,7 +23,7 @@ name: Release
 #   not run in this repo's own CI and has no visibility into this copy from
 #   here. In cwc's own (single-repo) CI it inspects zero repos by design; a
 #   full-workspace `--check` is what actually catches drift in ideate-core /
-#   panelist / tickle-stick. If this file has drifted, the fix is a re-sync
+#   panelist / aux-comprehension-test. If this file has drifted, the fix is a re-sync
 #   from cwc, never a local edit.
 #
 # To change the npm publish flow, edit THIS template and re-run the sync
@@ -70,6 +71,35 @@ name: Release
 # Comment after each pin records the semver tag the SHA corresponded to
 # at pin time, for human-readable version tracking.
 
+# Three jobs, least privilege. No job holds both `contents: write` and
+# `id-token: write`, and no job that holds either one runs install, build or
+# test code:
+#
+#   test       contents: read only. Tag/version and ancestor-of-main checks,
+#              `npm ci`, build, tests, then `npm pack`. Uploads the exact
+#              tarball it built and tested as an artifact.
+#   publish    needs: test. contents: read + id-token: write (the npm OIDC
+#              identity), in the `release` environment. Downloads the tarball
+#              and runs `npm publish <tarball> --provenance`. No checkout, no
+#              install from the registry, no repo scripts.
+#   gh-release needs: publish. contents: write only. Creates the GitHub
+#              Release from the tag's CHANGELOG.md section.
+#
+# The `release` environment is where a repo admin can require a reviewer
+# before anything is published. GitHub creates an environment named in a
+# workflow on first use, with no protection rules, so this file works before
+# that configuration exists. If the package's Trusted Publisher entry on
+# npmjs.com names an environment, it must be `release`; an entry with no
+# environment matches any.
+#
+# npm: the publish job uses the npm bundled with Node 24 (11.19.x on
+# `ubuntu-latest` at the time of writing), which is above the Trusted
+# Publishing floor (npm >= 11.5.1). The alternative, `npm install -g npm@X`,
+# fetches npm from the registry by version with no integrity check (Scorecard
+# Pinned-Dependencies) and would run registry code inside the job that holds
+# the publish identity. A step fails fast if the bundled npm is ever below the
+# floor, before anything is published.
+
 on:
   push:
     tags:
@@ -79,15 +109,11 @@ permissions:
   contents: read
 
 jobs:
-  build-and-publish:
-    name: Build + publish to npm
+  test:
+    name: Verify, build + test
     runs-on: ubuntu-latest
     permissions:
-      # `write`, not `read`: the post-publish step creates a GitHub Release
-      # object (tickle-stick#184). Still the minimum this job needs — no
-      # packages/deployments/actions scopes are granted.
-      contents: write
-      id-token: write         # npm provenance attestations via OIDC
+      contents: read
     steps:
       # fetch-depth: 0 — the "tag is on merged code" assertion below needs the
       # full history to test ancestry of the tagged SHA against origin/main.
@@ -96,10 +122,9 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
 
       # Gap 2 (cwc#1821): the tag was never checked against package.json, so
       # tagging `v9.9.9` on a tree whose manifest says `0.3.1` published `0.3.1`
@@ -134,24 +159,6 @@ jobs:
           fi
           echo "OK: tagged commit ${GITHUB_SHA} is reachable from origin/main."
 
-      # Trusted publishing requires npm >= 11.5.1 — Node 20 ships npm 10.x,
-      # which signs provenance attestations but doesn't perform the
-      # OIDC↔registry token exchange. Pin to the npm 11 line: `npm@latest`
-      # is now npm 12, which dropped Node 20 (requires node >=22) and fails
-      # this step with EBADENGINE. npm 11.x still supports Node 20
-      # (^20.17.0) and satisfies the >= 11.5.1 trusted-publishing floor.
-      # cwc#2030: pinned to an EXACT version (not the floating `npm@11`
-      # range) — this step performs the OIDC↔registry token exchange for
-      # Trusted Publishing, so an upstream 11.x regression must not land
-      # unannounced in the publish path. 11.19.0 was the newest 11.x at
-      # pin time (`npm view npm versions --json`), satisfies the >= 11.5.1
-      # floor, is < 12, and declares Node 20 support (`^20.17.0 || >=22.9.0`
-      # per `npm view npm@11.19.0 engines`). Bump this pin deliberately.
-      - name: Upgrade npm to support trusted publishing
-        run: |
-          npm install -g npm@11.19.0
-          npm --version
-
       - name: Install
         run: npm ci
 
@@ -168,42 +175,101 @@ jobs:
       # signed a broken-but-untested artifact with a trusted identity — and npm
       # forbids re-publishing an unpublished version (unpublish only within 72h).
       # `--if-present` mirrors the Build step above: a repo WITH a test script
-      # (the real concern — a tested package whose tests regressed) runs and
-      # gates on it, while a build-less/test-less package stays a no-op exit 0,
-      # so the same bytes are correct across every npm repo. Byte-match is what
-      # the drift-check asserts, so the conditional lives in the canonical
-      # template, never as a per-repo stub.
+      # gates on it, while a test-less package stays a no-op exit 0.
       - name: Test
         run: npm run test --if-present
 
-      - name: Verify package contents
-        run: npm pack --dry-run
+      # Strip `publishConfig.registry` before packing (load-bearing).
+      # A repo may set `publishConfig.registry` to pin an org-scoped registry
+      # (e.g. GitHub Packages) for a separate publish path, and that field takes
+      # precedence over setup-node's `registry-url` — so verbatim the template
+      # would try to publish the PUBLIC unscoped package to the scoped registry
+      # and fail. The key is now baked out of the packed manifest here, so the
+      # publish job needs no repo checkout to do it. `npm pkg delete` on an
+      # absent key is a no-op, so repos with `publishConfig: null` are fine too.
+      - name: Strip publishConfig.registry (publish to npmjs, not a scoped registry)
+        run: npm pkg delete publishConfig.registry
+
+      # The tarball built and tested here is the exact artifact that gets
+      # published; the publish job runs none of the repo's scripts.
+      - name: Pack
+        run: |
+          set -euo pipefail
+          mkdir -p release-pack
+          npm pack --pack-destination release-pack
+          ls -l release-pack
+
+      - name: Upload package tarball
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-pack
+          path: release-pack/*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to npm
+    needs: test
+    runs-on: ubuntu-latest
+    # Where a repo admin can require a reviewer before the publish runs.
+    environment: release
+    permissions:
+      contents: read
+      id-token: write         # npm provenance attestations via OIDC
+    steps:
+      # No checkout: this job publishes only the tarball `test` uploaded, so no
+      # repo file and no repo script is present here.
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Require npm >= 11.5.1 for trusted publishing
+        run: |
+          set -euo pipefail
+          npm --version
+          node -e 'const v=process.argv[1].split(".").map(Number);const ok=v[0]>11||(v[0]===11&&(v[1]>5||(v[1]===5&&v[2]>=1)));if(!ok){console.error("::error::npm "+process.argv[1]+" is below 11.5.1 (needed for npm Trusted Publishing)");process.exit(1)}' "$(npm --version)"
+
+      - name: Download package tarball
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-pack
+          path: release-pack
 
       # npm Trusted Publishing (OIDC) via the publisher configured on
       # npmjs.com for each package (owner Kromatic-Innovation, the package's
       # own repo, workflow release.yml). No NPM_TOKEN secret is present
       # anywhere — org or repo. CI logs show "Signed provenance statement
       # ... from GitHub Actions" with no stored credential of any kind.
-      # OIDC detection needs npm >= 11.5.1 (see the upgrade step above); a
-      # 404/ENEEDAUTH here is that floor not being met, not a broken
-      # publisher. Confirmed working on tickle-stick since v0.4.1.
-      #
-      # Strip `publishConfig.registry` before publishing (cwc#1590; load-bearing,
-      # named by cwc#1559's own scope and then dropped). A repo may set
-      # `publishConfig.registry` to pin an org-scoped registry (e.g. GitHub
-      # Packages) for a separate publish path, and that field takes
-      # precedence over setup-node's `registry-url` — so verbatim the template
-      # would try to publish the PUBLIC unscoped package to the scoped registry
-      # and fail. Deleting the key routes the trusted-publishing publish to
-      # `registry.npmjs.org`. `npm pkg delete` on an absent key is a no-op, so
-      # the same bytes are correct for repos with `publishConfig: null`
-      # (currently all three npm publishers — ideate-core / panelist /
-      # tickle-stick — cwc#2905) too.
-      - name: Strip publishConfig.registry (publish to npmjs, not a scoped registry)
-        run: npm pkg delete publishConfig.registry
-
+      # The workflow filename (release.yml) is what Trusted Publishing keys
+      # on; splitting into jobs does not change it.
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          # Leading `./` is load-bearing: npm reads a bare `dir/name.tgz` as a
+          # GitHub `owner/repo` shorthand (a git spec), not a local file.
+          TARBALLS=(./release-pack/*.tgz)
+          if [ "${#TARBALLS[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one tarball in release-pack/, found ${#TARBALLS[@]}."
+            exit 1
+          fi
+          npm publish "${TARBALLS[0]}" --provenance --access public
+
+  gh-release:
+    name: Create GitHub Release
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      # `write`: creates the GitHub Release object. No other scope.
+      contents: write
+    steps:
+      # Checkout is only for CHANGELOG.md (the release notes); no repo script
+      # runs in this job. Credentials are not persisted into the workspace.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
 
       # Gap 4 (tickle-stick#184): the tag was published to npm but no GitHub
       # Release object was ever created, so a repo's Releases tab kept showing
